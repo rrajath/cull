@@ -19,6 +19,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -73,7 +74,7 @@ fun SettingsScreen(
     var mirrorDeletes by remember { mutableStateOf(false) }
     var darkTheme by remember { mutableStateOf(true) }
     var accentHue by remember { mutableStateOf(40) }
-    var connectionStatus by remember { mutableStateOf("Not tested") }
+    var connectionStatus by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(settingsRepository) {
         launch {
@@ -285,25 +286,17 @@ fun SettingsScreen(
                             },
                             placeholder = "Enter API key"
                         )
-                        Row(
+                        Box(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
+                            contentAlignment = Alignment.CenterEnd
                         ) {
-                            Text(
-                                text = connectionStatus,
-                                style = androidx.compose.material3.MaterialTheme.typography.labelLarge.copy(
-                                    color = if (connectionStatus == "Connected") colors.accent else colors.fgDim,
-                                    fontSize = 12.sp
-                                )
-                            )
                             Box(
                                 modifier = Modifier
                                     .clip(RoundedCornerShape(999.dp))
                                     .background(colors.accentSoft)
                                     .clickable {
                                         if (immichUrl.isBlank() || immichApiKey.isBlank()) {
-                                            connectionStatus = "URL and API key required"
+                                            connectionStatus = "Please enter both Server URL and API Key"
                                             return@clickable
                                         }
                                         connectionStatus = "Testing..."
@@ -313,10 +306,10 @@ fun SettingsScreen(
                                                 val result = api.getServerAbout()
                                                 result.fold(
                                                     onSuccess = { info ->
-                                                        connectionStatus = "Connected (${info.version})"
+                                                        connectionStatus = "Connected to Immich ${info.version}"
                                                     },
                                                     onFailure = { error ->
-                                                        connectionStatus = "Failed: ${error.message}"
+                                                        connectionStatus = "Connection failed: ${error.message}"
                                                     }
                                                 )
                                             } catch (e: Exception) {
@@ -337,6 +330,37 @@ fun SettingsScreen(
                         }
                     }
                 }
+            }
+
+            connectionStatus?.let { status ->
+                AlertDialog(
+                    onDismissRequest = { connectionStatus = null },
+                    title = {
+                        Text(
+                            text = if (status == "Testing...") "Testing Connection" else "Connection Result",
+                            style = androidx.compose.material3.MaterialTheme.typography.titleLarge.copy(
+                                color = colors.fg
+                            )
+                        )
+                    },
+                    text = {
+                        Text(
+                            text = status,
+                            style = androidx.compose.material3.MaterialTheme.typography.bodyMedium.copy(
+                                color = colors.fgDim
+                            )
+                        )
+                    },
+                    confirmButton = {
+                        androidx.compose.material3.TextButton(
+                            onClick = { connectionStatus = null }
+                        ) {
+                            Text("OK", color = colors.accent)
+                        }
+                    },
+                    containerColor = colors.bgElev,
+                    tonalElevation = 0.dp
+                )
             }
 
             Section(text = "Culling") {
