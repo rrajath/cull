@@ -6,6 +6,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -17,6 +18,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Slider
@@ -525,26 +527,39 @@ private fun SettingsInputRow(
                 fontSize = 13.sp
             )
         )
-        Box(
+        BasicTextField(
+            value = value,
+            onValueChange = onValueChange,
+            textStyle = androidx.compose.material3.MaterialTheme.typography.labelLarge.copy(
+                color = colors.fg,
+                fontSize = 13.sp
+            ),
             modifier = Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(10.dp))
                 .background(colors.bg)
-                .padding(12.dp)
-        ) {
-            Text(
-                text = if (value.isEmpty()) {
-                    placeholder
+                .padding(12.dp),
+            decorationBox = { innerTextField ->
+                if (value.isEmpty()) {
+                    Text(
+                        text = placeholder,
+                        style = androidx.compose.material3.MaterialTheme.typography.labelLarge.copy(
+                            color = colors.fgFaint,
+                            fontSize = 13.sp
+                        )
+                    )
                 } else if (masked) {
-                    "•".repeat(value.length)
+                    Text(
+                        text = "•".repeat(value.length),
+                        style = androidx.compose.material3.MaterialTheme.typography.labelLarge.copy(
+                            color = colors.fg,
+                            fontSize = 13.sp
+                        )
+                    )
                 } else {
-                    value
-                },
-                style = androidx.compose.material3.MaterialTheme.typography.labelLarge.copy(
-                    color = if (value.isEmpty()) colors.fgFaint else colors.fg,
-                    fontSize = 13.sp
-                )
-            )
-        }
+                    innerTextField()
+                }
+            }
+        )
     }
 }
