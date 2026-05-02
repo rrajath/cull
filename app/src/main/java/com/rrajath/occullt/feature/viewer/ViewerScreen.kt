@@ -13,8 +13,10 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -50,6 +52,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
@@ -147,7 +150,9 @@ fun ViewerScreen(
     ) {
         HorizontalPager(
             state = pagerState,
-            modifier = Modifier.fillMaxSize()
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(horizontal = 24.dp),
+            pageSpacing = 16.dp
         ) { page ->
             val photo = photos[page]
             val isPinned = state.pinnedId == photo.id
@@ -364,6 +369,15 @@ private fun ViewerPhotoPage(
                 onClick = onToggleHud,
                 onLongClick = onLongPress
             )
+            .pointerInput(Unit) {
+                detectTapGestures(
+                    onPress = {
+                        onLongPress()
+                        tryAwaitRelease()
+                        onRelease()
+                    }
+                )
+            }
     ) {
         AsyncImage(
             model = ImageRequest.Builder(LocalContext.current)
