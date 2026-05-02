@@ -71,9 +71,13 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
 import coil3.request.crossfade
-import com.rrajath.occullt.core.datastore.LocalPhotoRepository
 import com.rrajath.occullt.core.datastore.SettingsRepository
-import com.rrajath.occullt.core.model.PhotoItem
+import com.rrajath.occullt.core.datastore.UnifiedPhotoRepository
+import com.rrajath.occullt.core.model.PhotoSource
+import com.rrajath.occullt.core.model.UnifiedPhotoItem
+import com.rrajath.occullt.core.network.ImmichApi
+import com.rrajath.occullt.core.network.ImmichRepository
+import com.rrajath.occullt.ui.component.SourceMode
 import com.rrajath.occullt.ui.icon.CullIcons
 import com.rrajath.occullt.ui.theme.LocalExtendedColorScheme
 import kotlinx.coroutines.delay
@@ -96,18 +100,27 @@ fun ViewerScreen(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
-    var photos by remember { mutableStateOf<List<PhotoItem>>(emptyList()) }
+    var photos by remember { mutableStateOf<List<UnifiedPhotoItem>>(emptyList()) }
     var isLoadingPhotos by remember { mutableStateOf(true) }
 
     LaunchedEffect(folderUri) {
         if (folderUri != null) {
-            if (folderUri == "mediastore") {
-                val repo = LocalPhotoRepository(context)
-                photos = repo.loadCameraPhotosFromMediaStore(context)
+            isLoadingPhotos = true
+            val sourceMode = settingsRepository.sourceMode.first()
+            val immichUrl = settingsRepository.immichUrl.first()
+            val immichApiKey = settingsRepository.immichApiKey.first()
+
+            val immichRepo = if (sourceMode != SourceMode.Local && !immichUrl.isNullOrBlank() && !immichApiKey.isNullOrBlank()) {
+                ImmichRepository(ImmichApi(immichUrl, immichApiKey))
             } else {
-                val uri = Uri.parse(folderUri)
-                val repo = LocalPhotoRepository(context)
-                photos = repo.getPhotosFromFolder(uri)
+                null
+            }
+
+            val unifiedRepo = UnifiedPhotoRepository(context, immichRepo)
+            val result = unifiedRepo.loadPhotos(sourceMode, folderUri)
+
+            if (result.isSuccess) {
+                photos = result.getOrNull().orEmpty()
             }
             isLoadingPhotos = false
         }
@@ -188,6 +201,7 @@ fun ViewerScreen(
                 pinnedPhoto = pinnedPhoto,
                 isLoading = state.isLoading,
                 isMarked = state.isMarked,
+                sourceMode = photos.getOrNull(pagerState.currentPage)?.source ?: PhotoSource.Local,
                 onToggleHud = { viewModel.toggleHud() },
                 onLongPress = {
                     if (state.pinnedId == photo.id) {
@@ -235,6 +249,7 @@ fun ViewerScreen(
                 markedCount = state.markedIds.size,
                 isPinned = isCurrentPinned,
                 isMarked = state.isMarked,
+                sourceMode = photos.getOrNull(pagerState.currentPage)?.source ?: PhotoSource.Local,
                 onTogglePin = {
                     val currentPhoto = photos.getOrNull(pagerState.currentPage)
                     if (currentPhoto != null) {
@@ -290,20 +305,42 @@ fun ViewerScreen(
         }
 
         if (state.showDeleteDialog) {
+            val localMarkedCount = state.markedIds.count { id ->
+                photos.find { it.id == id }?.source == PhotoSource.Local
+            }
+            val immichMarkedCount = state.markedIds.count { id ->
+                photos.find { it.id == id }?.source == PhotoSource.Immich
+            }
+
             DeleteConfirmationDialog(
                 markedCount = state.markedIds.size,
+                localCount = localMarkedCount,
+                immichCount = immichMarkedCount,
                 onDismiss = { viewModel.hideDeleteDialog() },
                 onConfirm = {
                     scope.launch {
                         viewModel.setDeleting(true)
                         val dryRun = settingsRepository.dryRun.first()
+                        val mirrorDeletes = settingsRepository.mirrorDeletes.first()
+                        
                         if (!dryRun) {
-                            val contentResolver = context.contentResolver
-                            val urisToDelete = state.markedIds.mapNotNull { id ->
-                                photos.find { it.id == id }?.uri
+                            val immichUrl = settingsRepository.immichUrl.first()
+                            val immichApiKey = settingsRepository.immichApiKey.first()
+                            
+                            val immichRepo = if (!immichUrl.isNullOrBlank() && !immichApiKey.isNullOrBlank()) {
+                                ImmichRepository(ImmichApi(immichUrl, immichApiKey))
+                            } else {
+                                null
                             }
-                            deletePhotosViaMediaStore(contentResolver, urisToDelete)
+
+                            val unifiedRepo = UnifiedPhotoRepository(context, immichRepo)
+                            val photosToDelete = state.markedIds.mapNotNull { id ->
+                                photos.find { it.id == id }
+                            }
+
+                            unifiedRepo.deletePhotos(photosToDelete, mirrorDeletes)
                         }
+                        
                         delay(800)
                         viewModel.setDeleting(false)
                         viewModel.setDeleteSuccess(true)
@@ -339,41 +376,18 @@ fun ViewerScreen(
     }
 }
 
-private fun deletePhotosViaMediaStore(contentResolver: ContentResolver, uris: List<Uri>) {
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-        try {
-            val pendingIntent = MediaStore.createTrashRequest(contentResolver, uris, true)
-            pendingIntent.send()
-        } catch (e: Exception) {
-            try {
-                val pendingIntent = MediaStore.createDeleteRequest(contentResolver, uris)
-                pendingIntent.send()
-            } catch (e2: Exception) {
-                e2.printStackTrace()
-            }
-        }
-    } else {
-        uris.forEach { uri ->
-            try {
-                contentResolver.delete(uri, null, null)
-            } catch (e: Exception) {
-                e.printStackTrace()
-            }
-        }
-    }
-}
-
 @Composable
 private fun ViewerPhotoPage(
-    photo: PhotoItem,
+    photo: UnifiedPhotoItem,
     index: Int,
     totalCount: Int,
     isPinned: Boolean,
     isLongPressing: Boolean,
     isShowingPinned: Boolean,
-    pinnedPhoto: PhotoItem?,
+    pinnedPhoto: UnifiedPhotoItem?,
     isLoading: Boolean,
     isMarked: Boolean,
+    sourceMode: PhotoSource,
     onToggleHud: () -> Unit,
     onLongPress: () -> Unit,
     onLongPressRelease: () -> Unit,
@@ -485,9 +499,14 @@ private fun ViewerPhotoPage(
                     }
                 }
         ) {
+            val imageUrl = when (displayPhoto.source) {
+                PhotoSource.Local -> displayPhoto.uri
+                PhotoSource.Immich -> displayPhoto.previewUrl ?: displayPhoto.originalUrl ?: displayPhoto.uri
+            }
+
             AsyncImage(
                 model = ImageRequest.Builder(LocalContext.current)
-                    .data(displayPhoto.uri)
+                    .data(imageUrl)
                     .crossfade(false)
                     .listener(
                         onSuccess = { _, _ -> onLoadingChanged(false) },
@@ -581,6 +600,7 @@ private fun HudPill(
     markedCount: Int,
     isPinned: Boolean,
     isMarked: Boolean,
+    sourceMode: PhotoSource,
     onTogglePin: () -> Unit,
     onToggleMark: () -> Unit,
     onConfirm: () -> Unit,
@@ -607,7 +627,10 @@ private fun HudPill(
                     .padding(horizontal = 12.dp, vertical = 6.dp)
             ) {
                 Text(
-                    text = "Local only",
+                    text = when (sourceMode) {
+                        PhotoSource.Local -> "Local only"
+                        PhotoSource.Immich -> "Immich"
+                    },
                     style = androidx.compose.material3.MaterialTheme.typography.labelLarge.copy(
                         color = colors.fgDim,
                         fontSize = 11.sp
@@ -733,6 +756,8 @@ private fun HudPill(
 @Composable
 private fun DeleteConfirmationDialog(
     markedCount: Int,
+    localCount: Int,
+    immichCount: Int,
     onDismiss: () -> Unit,
     onConfirm: () -> Unit,
     isDeleting: Boolean,
@@ -799,7 +824,7 @@ private fun DeleteConfirmationDialog(
                             )
                         )
                         Text(
-                            text = "$markedCount",
+                            text = "$localCount",
                             style = androidx.compose.material3.MaterialTheme.typography.labelLarge.copy(
                                 color = colors.fg,
                                 fontSize = 13.sp,
@@ -820,10 +845,11 @@ private fun DeleteConfirmationDialog(
                             )
                         )
                         Text(
-                            text = "0",
+                            text = "$immichCount",
                             style = androidx.compose.material3.MaterialTheme.typography.labelLarge.copy(
-                                color = colors.fgFaint,
-                                fontSize = 13.sp
+                                color = colors.fg,
+                                fontSize = 13.sp,
+                                fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold
                             )
                         )
                     }
@@ -1075,4 +1101,3 @@ fun HudBar(
         }
     }
 }
-

@@ -1,10 +1,7 @@
 package com.rrajath.occullt.feature.library
 
 import android.Manifest
-import android.content.ContentUris
 import android.content.pm.PackageManager
-import android.net.Uri
-import android.provider.MediaStore
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -48,10 +45,12 @@ import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
 import coil3.request.crossfade
 import com.rrajath.occullt.core.datastore.SettingsRepository
-import com.rrajath.occullt.core.model.PhotoItem
+import com.rrajath.occullt.core.model.PhotoSource
 import com.rrajath.occullt.ui.component.CircleIcon
+import com.rrajath.occullt.ui.component.SourceMode
 import com.rrajath.occullt.ui.icon.CullIcons
 import com.rrajath.occullt.ui.theme.LocalExtendedColorScheme
+import kotlinx.coroutines.flow.first
 
 @Composable
 fun LibraryScreen(
@@ -76,20 +75,26 @@ fun LibraryScreen(
         permissionGranted = granted
         permissionDenied = !granted
         if (granted) {
-            viewModel.loadCameraPhotos(context)
+            viewModel.loadPhotos()
         }
     }
 
     LaunchedEffect(Unit) {
-        val hasPermission = ContextCompat.checkSelfPermission(
-            context,
-            Manifest.permission.READ_MEDIA_IMAGES
-        ) == PackageManager.PERMISSION_GRANTED
-        permissionGranted = hasPermission
-        if (hasPermission) {
-            viewModel.loadCameraPhotos(context)
+        val sourceMode = settingsRepository.sourceMode.first()
+        if (sourceMode == com.rrajath.occullt.ui.component.SourceMode.Immich) {
+            permissionGranted = true
+            viewModel.loadPhotos()
         } else {
-            permissionLauncher.launch(Manifest.permission.READ_MEDIA_IMAGES)
+            val hasPermission = ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.READ_MEDIA_IMAGES
+            ) == PackageManager.PERMISSION_GRANTED
+            permissionGranted = hasPermission
+            if (hasPermission) {
+                viewModel.loadPhotos()
+            } else {
+                permissionLauncher.launch(Manifest.permission.READ_MEDIA_IMAGES)
+            }
         }
     }
 
@@ -124,8 +129,13 @@ fun LibraryScreen(
                         fontSize = 28.sp
                     )
                 )
+                val subtitle = when {
+                    state.isLoading -> "Loading..."
+                    state.error != null -> state.error!!
+                    else -> "${state.photos.size} photos"
+                }
                 Text(
-                    text = "${state.photos.size} photos",
+                    text = subtitle,
                     style = androidx.compose.material3.MaterialTheme.typography.labelLarge.copy(
                         color = colors.fgDim,
                         fontSize = 12.sp
@@ -134,7 +144,7 @@ fun LibraryScreen(
             }
         }
 
-        if (!permissionGranted && !permissionDenied) {
+        if (state.isLoading) {
             Box(
                 modifier = Modifier.fillMaxSize(),
                 contentAlignment = Alignment.Center
@@ -145,7 +155,7 @@ fun LibraryScreen(
                     strokeWidth = 3.dp
                 )
             }
-        } else if (permissionDenied) {
+        } else if (state.error != null && state.photos.isEmpty()) {
             Box(
                 modifier = Modifier.fillMaxSize(),
                 contentAlignment = Alignment.Center
@@ -161,7 +171,7 @@ fun LibraryScreen(
                         modifier = Modifier.size(48.dp)
                     )
                     Text(
-                        text = "Permission denied. Please grant photo access in Settings.",
+                        text = state.error ?: "No photos found",
                         style = androidx.compose.material3.MaterialTheme.typography.bodyLarge.copy(
                             color = colors.fgDim,
                             fontSize = 14.sp
@@ -169,24 +179,13 @@ fun LibraryScreen(
                     )
                 }
             }
-        } else if (state.isLoading) {
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center
-            ) {
-                CircularProgressIndicator(
-                    color = colors.accent,
-                    modifier = Modifier.size(46.dp),
-                    strokeWidth = 3.dp
-                )
-            }
         } else if (state.photos.isEmpty()) {
             Box(
                 modifier = Modifier.fillMaxSize(),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = "No photos found in Camera folder",
+                    text = "No photos found",
                     style = androidx.compose.material3.MaterialTheme.typography.bodyLarge.copy(
                         color = colors.fgDim,
                         fontSize = 14.sp
@@ -210,11 +209,22 @@ fun LibraryScreen(
                         modifier = Modifier
                             .aspectRatio(0.75f)
                             .clip(RoundedCornerShape(14.dp))
-                            .clickable { onPhotoClick(index, "mediastore") }
+                            .clickable {
+                                val uri = when (photo.source) {
+                                    PhotoSource.Local -> "mediastore"
+                                    PhotoSource.Immich -> "immich"
+                                }
+                                onPhotoClick(index, uri)
+                            }
                     ) {
+                        val imageUrl = when (photo.source) {
+                            PhotoSource.Local -> photo.uri
+                            PhotoSource.Immich -> photo.previewUrl ?: photo.uri
+                        }
+
                         AsyncImage(
                             model = ImageRequest.Builder(LocalContext.current)
-                                .data(photo.uri)
+                                .data(imageUrl)
                                 .crossfade(false)
                                 .build(),
                             contentDescription = photo.name,
@@ -261,6 +271,25 @@ fun LibraryScreen(
                                     contentDescription = "Marked for deletion",
                                     tint = Color.White,
                                     modifier = Modifier.size(12.dp)
+                                )
+                            }
+                        }
+
+                        if (photo.source == PhotoSource.Immich || state.sourceMode == SourceMode.Hybrid) {
+                            Box(
+                                modifier = Modifier
+                                    .align(Alignment.BottomEnd)
+                                    .padding(4.dp)
+                                    .clip(RoundedCornerShape(999.dp))
+                                    .background(Color.Black.copy(alpha = 0.6f))
+                                    .padding(horizontal = 6.dp, vertical = 3.dp)
+                            ) {
+                                Text(
+                                    text = if (photo.source == PhotoSource.Immich) "Cloud" else "Local",
+                                    style = androidx.compose.material3.MaterialTheme.typography.labelLarge.copy(
+                                        color = Color.White.copy(alpha = 0.9f),
+                                        fontSize = 9.sp
+                                    )
                                 )
                             }
                         }
