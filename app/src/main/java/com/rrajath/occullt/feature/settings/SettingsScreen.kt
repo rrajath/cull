@@ -18,9 +18,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Switch
@@ -281,8 +282,7 @@ fun SettingsScreen(
                                     settingsRepository.setImmichApiKey(newValue)
                                 }
                             },
-                            placeholder = "••••••••",
-                            masked = true
+                            placeholder = "Enter API key"
                         )
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -516,7 +516,6 @@ private fun SettingsInputRow(
     value: String,
     onValueChange: (String) -> Unit,
     placeholder: String,
-    masked: Boolean = false,
 ) {
     val colors = LocalExtendedColorScheme.current
     Column {
@@ -527,39 +526,33 @@ private fun SettingsInputRow(
                 fontSize = 13.sp
             )
         )
-        BasicTextField(
+        OutlinedTextField(
             value = value,
             onValueChange = onValueChange,
+            placeholder = {
+                Text(
+                    text = placeholder,
+                    style = androidx.compose.material3.MaterialTheme.typography.labelLarge.copy(
+                        color = colors.fgFaint,
+                        fontSize = 13.sp
+                    )
+                )
+            },
+            singleLine = true,
             textStyle = androidx.compose.material3.MaterialTheme.typography.labelLarge.copy(
                 color = colors.fg,
                 fontSize = 13.sp
             ),
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(10.dp))
-                .background(colors.bg)
-                .padding(12.dp),
-            decorationBox = { innerTextField ->
-                if (value.isEmpty()) {
-                    Text(
-                        text = placeholder,
-                        style = androidx.compose.material3.MaterialTheme.typography.labelLarge.copy(
-                            color = colors.fgFaint,
-                            fontSize = 13.sp
-                        )
-                    )
-                } else if (masked) {
-                    Text(
-                        text = "•".repeat(value.length),
-                        style = androidx.compose.material3.MaterialTheme.typography.labelLarge.copy(
-                            color = colors.fg,
-                            fontSize = 13.sp
-                        )
-                    )
-                } else {
-                    innerTextField()
-                }
-            }
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = colors.accent,
+                unfocusedBorderColor = colors.line,
+                focusedContainerColor = colors.bg,
+                unfocusedContainerColor = colors.bg,
+                cursorColor = colors.accent,
+                focusedTextColor = colors.fg,
+                unfocusedTextColor = colors.fg
+            ),
+            modifier = Modifier.fillMaxWidth()
         )
     }
 }
