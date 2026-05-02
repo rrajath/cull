@@ -405,7 +405,7 @@ fun SettingsScreen(
                                         .size(36.dp)
                                         .clip(CircleShape)
                                         .background(
-                                            Color.hsl(hue / 360f, 0.7f, 0.55f)
+                                            Color.hsl(hue.toFloat(), 0.7f, 0.55f)
                                         )
                                         .then(
                                             if (isSelected) {

@@ -1,6 +1,10 @@
 package com.rrajath.occullt.feature.library
 
+import android.Manifest
+import android.content.ContentUris
+import android.content.pm.PackageManager
 import android.net.Uri
+import android.provider.MediaStore
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -16,7 +20,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -27,6 +30,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -36,13 +42,14 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
 import coil3.request.crossfade
 import com.rrajath.occullt.core.datastore.SettingsRepository
+import com.rrajath.occullt.core.model.PhotoItem
 import com.rrajath.occullt.ui.component.CircleIcon
-import com.rrajath.occullt.ui.component.ContinuePill
 import com.rrajath.occullt.ui.icon.CullIcons
 import com.rrajath.occullt.ui.theme.LocalExtendedColorScheme
 
@@ -58,16 +65,31 @@ fun LibraryScreen(
     )
     val state by viewModel.state.collectAsState()
     val colors = LocalExtendedColorScheme.current
+    val context = LocalContext.current
 
-    val folderPickerLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.OpenDocumentTree()
-    ) { uri ->
-        uri?.let { viewModel.setFolderUri(it) }
+    var permissionGranted by remember { mutableStateOf(false) }
+    var permissionDenied by remember { mutableStateOf(false) }
+
+    val permissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        permissionGranted = granted
+        permissionDenied = !granted
+        if (granted) {
+            viewModel.loadCameraPhotos(context)
+        }
     }
 
-    LaunchedEffect(state.folderUri) {
-        if (state.folderUri == null) {
-            folderPickerLauncher.launch(null)
+    LaunchedEffect(Unit) {
+        val hasPermission = ContextCompat.checkSelfPermission(
+            context,
+            Manifest.permission.READ_MEDIA_IMAGES
+        ) == PackageManager.PERMISSION_GRANTED
+        permissionGranted = hasPermission
+        if (hasPermission) {
+            viewModel.loadCameraPhotos(context)
+        } else {
+            permissionLauncher.launch(Manifest.permission.READ_MEDIA_IMAGES)
         }
     }
 
@@ -102,27 +124,17 @@ fun LibraryScreen(
                         fontSize = 28.sp
                     )
                 )
-                if (state.folderUri != null) {
-                    Text(
-                        text = "${state.photos.size} photos",
-                        style = androidx.compose.material3.MaterialTheme.typography.labelLarge.copy(
-                            color = colors.fgDim,
-                            fontSize = 12.sp
-                        )
+                Text(
+                    text = "${state.photos.size} photos",
+                    style = androidx.compose.material3.MaterialTheme.typography.labelLarge.copy(
+                        color = colors.fgDim,
+                        fontSize = 12.sp
                     )
-                } else {
-                    Text(
-                        text = "Select a folder",
-                        style = androidx.compose.material3.MaterialTheme.typography.labelLarge.copy(
-                            color = colors.fgDim,
-                            fontSize = 12.sp
-                        )
-                    )
-                }
+                )
             }
         }
 
-        if (state.isLoading) {
+        if (!permissionGranted && !permissionDenied) {
             Box(
                 modifier = Modifier.fillMaxSize(),
                 contentAlignment = Alignment.Center
@@ -133,7 +145,7 @@ fun LibraryScreen(
                     strokeWidth = 3.dp
                 )
             }
-        } else if (state.folderUri == null) {
+        } else if (permissionDenied) {
             Box(
                 modifier = Modifier.fillMaxSize(),
                 contentAlignment = Alignment.Center
@@ -149,7 +161,7 @@ fun LibraryScreen(
                         modifier = Modifier.size(48.dp)
                     )
                     Text(
-                        text = "Select a folder to browse photos",
+                        text = "Permission denied. Please grant photo access in Settings.",
                         style = androidx.compose.material3.MaterialTheme.typography.bodyLarge.copy(
                             color = colors.fgDim,
                             fontSize = 14.sp
@@ -157,13 +169,24 @@ fun LibraryScreen(
                     )
                 }
             }
+        } else if (state.isLoading) {
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center
+            ) {
+                CircularProgressIndicator(
+                    color = colors.accent,
+                    modifier = Modifier.size(46.dp),
+                    strokeWidth = 3.dp
+                )
+            }
         } else if (state.photos.isEmpty()) {
             Box(
                 modifier = Modifier.fillMaxSize(),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = "No photos found in this folder",
+                    text = "No photos found in Camera folder",
                     style = androidx.compose.material3.MaterialTheme.typography.bodyLarge.copy(
                         color = colors.fgDim,
                         fontSize = 14.sp
@@ -187,7 +210,7 @@ fun LibraryScreen(
                         modifier = Modifier
                             .aspectRatio(0.75f)
                             .clip(RoundedCornerShape(14.dp))
-                            .clickable { onPhotoClick(index, state.folderUri) }
+                            .clickable { onPhotoClick(index, "mediastore") }
                     ) {
                         AsyncImage(
                             model = ImageRequest.Builder(LocalContext.current)

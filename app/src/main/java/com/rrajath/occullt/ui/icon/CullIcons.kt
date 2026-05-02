@@ -1,6 +1,7 @@
 package com.rrajath.occullt.ui.icon
 
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Check
@@ -26,7 +27,7 @@ object CullIcons {
     val Albums: ImageVector = Icons.Default.PhotoLibrary
     val ZoomReset: ImageVector = Icons.Default.ZoomOutMap
     val ChevronRight: ImageVector = Icons.AutoMirrored.Filled.ArrowForward
-    val Arrow: ImageVector = Icons.AutoMirrored.Filled.ArrowForward
+    val Arrow: ImageVector = Icons.AutoMirrored.Filled.ArrowBack
     val Library: ImageVector = Icons.Default.PhotoLibrary
     val ArrowDown: ImageVector = Icons.Default.ArrowDropDown
     val X: ImageVector = Icons.Default.Close

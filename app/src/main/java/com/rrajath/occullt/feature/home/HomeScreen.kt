@@ -170,6 +170,8 @@ fun HomeScreen(
                 }
             )
 
+            Spacer(modifier = Modifier.height(12.dp))
+
             GiantButton(
                 title = "Albums",
                 subtitle = "Coming soon",

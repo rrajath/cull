@@ -1,14 +1,11 @@
 package com.rrajath.occullt.feature.viewer
 
 import android.content.ContentResolver
-import android.content.ContentUris
 import android.net.Uri
 import android.os.Build
 import android.provider.MediaStore
 import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -17,7 +14,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -27,7 +23,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -37,7 +32,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -48,7 +42,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -56,7 +49,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
@@ -65,7 +57,6 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -77,7 +68,6 @@ import com.rrajath.occullt.core.datastore.SettingsRepository
 import com.rrajath.occullt.core.model.PhotoItem
 import com.rrajath.occullt.ui.icon.CullIcons
 import com.rrajath.occullt.ui.theme.LocalExtendedColorScheme
-import kotlin.math.roundToInt
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.first
@@ -103,9 +93,14 @@ fun ViewerScreen(
 
     LaunchedEffect(folderUri) {
         if (folderUri != null) {
-            val uri = Uri.parse(folderUri)
-            val repo = LocalPhotoRepository(context)
-            photos = repo.getPhotosFromFolder(uri)
+            if (folderUri == "mediastore") {
+                val repo = LocalPhotoRepository(context)
+                photos = repo.loadCameraPhotosFromMediaStore(context)
+            } else {
+                val uri = Uri.parse(folderUri)
+                val repo = LocalPhotoRepository(context)
+                photos = repo.getPhotosFromFolder(uri)
+            }
             isLoadingPhotos = false
         }
     }
@@ -143,7 +138,7 @@ fun ViewerScreen(
 
     LaunchedEffect(pagerState.currentPage) {
         viewModel.setCurrentIndex(pagerState.currentPage)
-        viewModel.setLoading(true)
+        viewModel.setLoading(false)
         val currentPhoto = photos.getOrNull(pagerState.currentPage)
         if (currentPhoto != null) {
             viewModel.setIsMarked(state.markedIds.contains(currentPhoto.id))
@@ -384,18 +379,14 @@ private fun ViewerPhotoPage(
     onSwipeRelease: (Float) -> Unit,
 ) {
     val colors = LocalExtendedColorScheme.current
-    val context = LocalContext.current
-    var pressStartTime by remember { mutableLongStateOf(0L) }
+    var isDragging by remember { mutableStateOf(false) }
+    var dragStartY by remember { mutableStateOf(0f) }
 
     val displayPhoto = if (isShowingPinned && pinnedPhoto != null) pinnedPhoto else photo
     val currentScale = if (isShowingPinned) pinnedScale else scale
     val currentOffsetX = if (isShowingPinned) pinnedOffsetX else offsetX
     val currentOffsetY = if (isShowingPinned) pinnedOffsetY else offsetY
 
-    val grayscale by animateFloatAsState(
-        targetValue = if (isMarked) 1f else 0f,
-        label = "grayscale"
-    )
     val brightness by animateFloatAsState(
         targetValue = if (isMarked) 0.85f else 1f,
         label = "brightness"
@@ -420,46 +411,53 @@ private fun ViewerPhotoPage(
                 }
             )
             .pointerInput(Unit) {
-                detectTapGestures(
-                    onPress = {
-                        if (!isPinned) {
-                            pressStartTime = System.currentTimeMillis()
-                            onLongPress()
+                detectTransformGestures(
+                    onGesture = { _, pan, zoom, _ ->
+                        if (zoom != 1f) {
+                            val newScale = (currentScale * zoom).coerceIn(1f, 5f)
+                            if (newScale > 1f) {
+                                val newX = currentOffsetX + pan.x
+                                val newY = currentOffsetY + pan.y
+                                onZoomChanged(newScale, newX, newY)
+                            } else {
+                                onZoomChanged(1f, 0f, 0f)
+                            }
+                        } else if (currentScale > 1f && (pan.x != 0f || pan.y != 0f)) {
+                            val newX = currentOffsetX + pan.x
+                            val newY = currentOffsetY + pan.y
+                            onZoomChanged(currentScale, newX, newY)
                         }
-                        tryAwaitRelease()
-                        onRelease()
                     }
                 )
             }
             .pointerInput(Unit) {
-                detectTransformGestures { _, pan, zoom, _ ->
-                    if (zoom != 1f || pan.x != 0f || pan.y != 0f) {
-                        val newScale = (currentScale * zoom).coerceIn(1f, 5f)
-                        if (newScale > 1f) {
-                            val newX = currentOffsetX + pan.x
-                            val newY = currentOffsetY + pan.y
-                            onZoomChanged(newScale, newX, newY)
-                        } else {
-                            onZoomChanged(1f, 0f, 0f)
-                        }
-                    }
-                }
-            }
-            .pointerInput(Unit) {
                 detectDragGestures(
+                    onDragStart = { offset ->
+                        if (currentScale <= 1f) {
+                            isDragging = true
+                            dragStartY = offset.y
+                        }
+                    },
                     onDragCancel = {
-                        onSwipeRelease(swipeOffsetY)
+                        if (isDragging) {
+                            onSwipeRelease(swipeOffsetY)
+                            isDragging = false
+                        }
                     },
                     onDragEnd = {
-                        onSwipeRelease(swipeOffsetY)
+                        if (isDragging) {
+                            onSwipeRelease(swipeOffsetY)
+                            isDragging = false
+                        }
+                    },
+                    onDrag = { change, dragAmount ->
+                        if (isDragging && currentScale <= 1f) {
+                            val newY = swipeOffsetY + dragAmount.y
+                            onSwipeOffsetChanged(newY)
+                            change.consume()
+                        }
                     }
-                ) { change, dragAmount ->
-                    if (currentScale <= 1f) {
-                        val newY = swipeOffsetY + dragAmount.y
-                        onSwipeOffsetChanged(newY)
-                        change.consume()
-                    }
-                }
+                )
             }
     ) {
         Box(
