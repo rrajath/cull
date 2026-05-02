@@ -195,27 +195,14 @@ private fun CullMark(
     modifier: Modifier = Modifier,
 ) {
     val colors = LocalExtendedColorScheme.current
-    Row(
-        modifier = modifier,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(
-            text = "Cull",
-            style = androidx.compose.material3.MaterialTheme.typography.headlineLarge.copy(
-                color = colors.fg,
-                fontStyle = FontStyle.Italic,
-                fontSize = 28.sp,
-                lineHeight = 28.sp
-            )
-        )
-        Text(
-            text = ">>",
-            style = androidx.compose.material3.MaterialTheme.typography.headlineLarge.copy(
-                color = colors.accent,
-                fontStyle = FontStyle.Italic,
-                fontSize = 28.sp,
-                lineHeight = 28.sp
-            )
-        )
-    }
+    Text(
+        text = "CullQwen",
+        style = androidx.compose.material3.MaterialTheme.typography.headlineLarge.copy(
+            color = colors.fg,
+            fontStyle = FontStyle.Italic,
+            fontSize = 28.sp,
+            lineHeight = 28.sp
+        ),
+        modifier = modifier
+    )
 }
