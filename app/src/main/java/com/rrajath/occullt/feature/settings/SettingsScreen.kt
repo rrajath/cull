@@ -1,7 +1,6 @@
 package com.rrajath.occullt.feature.settings
 
 import android.content.Intent
-import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -55,6 +54,12 @@ import com.rrajath.occullt.ui.theme.LocalExtendedColorScheme
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
+enum class ConnectionState {
+    NotTested,
+    Connected,
+    Disconnected
+}
+
 @Composable
 fun SettingsScreen(
     onNavigateBack: () -> Unit,
@@ -74,7 +79,7 @@ fun SettingsScreen(
     var mirrorDeletes by remember { mutableStateOf(false) }
     var darkTheme by remember { mutableStateOf(true) }
     var accentHue by remember { mutableStateOf(40) }
-    var isConnected by remember { mutableStateOf(false) }
+    var connectionState by remember { mutableStateOf<ConnectionState>(ConnectionState.NotTested) }
     var isTesting by remember { mutableStateOf(false) }
 
     LaunchedEffect(settingsRepository) {
@@ -122,6 +127,26 @@ fun SettingsScreen(
             settingsRepository.accentHue.collectLatest { hue ->
                 accentHue = hue
             }
+        }
+    }
+
+    LaunchedEffect(immichUrl, immichApiKey) {
+        if (immichUrl.isNotBlank() && immichApiKey.isNotBlank()) {
+            isTesting = true
+            try {
+                val api = ImmichApi(immichUrl, immichApiKey)
+                val result = api.getServerAbout()
+                result.fold(
+                    onSuccess = { connectionState = ConnectionState.Connected },
+                    onFailure = { connectionState = ConnectionState.Disconnected }
+                )
+            } catch (e: Exception) {
+                connectionState = ConnectionState.Disconnected
+            } finally {
+                isTesting = false
+            }
+        } else {
+            connectionState = ConnectionState.NotTested
         }
     }
 
@@ -292,8 +317,8 @@ fun SettingsScreen(
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            if (isConnected) {
-                                Row(
+                            when (connectionState) {
+                                ConnectionState.Connected -> Row(
                                     horizontalArrangement = Arrangement.spacedBy(4.dp),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
@@ -311,6 +336,25 @@ fun SettingsScreen(
                                         )
                                     )
                                 }
+                                ConnectionState.Disconnected -> Row(
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(8.dp)
+                                            .clip(CircleShape)
+                                            .background(Color(0xFFEF4444))
+                                    )
+                                    Text(
+                                        text = "Not Connected",
+                                        style = androidx.compose.material3.MaterialTheme.typography.labelLarge.copy(
+                                            color = Color(0xFFEF4444),
+                                            fontSize = 12.sp
+                                        )
+                                    )
+                                }
+                                ConnectionState.NotTested -> {}
                             }
 
                             Box(
@@ -319,7 +363,6 @@ fun SettingsScreen(
                                     .background(colors.accentSoft)
                                     .clickable(enabled = !isTesting) {
                                         if (immichUrl.isBlank() || immichApiKey.isBlank()) {
-                                            Toast.makeText(context, "Please enter both Server URL and API Key", Toast.LENGTH_SHORT).show()
                                             return@clickable
                                         }
                                         isTesting = true
@@ -328,19 +371,11 @@ fun SettingsScreen(
                                                 val api = ImmichApi(immichUrl, immichApiKey)
                                                 val result = api.getServerAbout()
                                                 result.fold(
-                                                    onSuccess = {
-                                                        isConnected = true
-                                                    },
-                                                    onFailure = { error ->
-                                                        isConnected = false
-                                                        val errorMsg = error.message ?: error.javaClass.simpleName
-                                                        Toast.makeText(context, "Connection failed: $errorMsg", Toast.LENGTH_LONG).show()
-                                                    }
+                                                    onSuccess = { connectionState = ConnectionState.Connected },
+                                                    onFailure = { connectionState = ConnectionState.Disconnected }
                                                 )
                                             } catch (e: Exception) {
-                                                isConnected = false
-                                                val errorMsg = e.message ?: e.javaClass.simpleName
-                                                Toast.makeText(context, "Error: $errorMsg", Toast.LENGTH_LONG).show()
+                                                connectionState = ConnectionState.Disconnected
                                             } finally {
                                                 isTesting = false
                                             }
