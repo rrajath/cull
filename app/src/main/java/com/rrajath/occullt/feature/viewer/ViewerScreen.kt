@@ -12,7 +12,11 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -44,17 +48,21 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.PointerInputChange
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
@@ -153,9 +161,16 @@ fun ViewerScreen(
             .fillMaxSize()
             .background(Color.Black)
     ) {
-        HorizontalPager(
+    var isCurrentPageZoomed by remember { mutableStateOf(false) }
+
+    LaunchedEffect(pagerState.currentPage) {
+        isCurrentPageZoomed = false
+    }
+
+    HorizontalPager(
             state = pagerState,
-            modifier = Modifier.fillMaxSize()
+            modifier = Modifier.fillMaxSize(),
+            userScrollEnabled = !isCurrentPageZoomed
         ) { page ->
             val photo = photos[page]
             val isPinned = state.pinnedId == photo.id
@@ -201,6 +216,11 @@ fun ViewerScreen(
                     scope.launch {
                         settingsRepository.setMarkedIds(viewModel.state.value.markedIds)
                     }
+                },
+                onZoomStateChanged = { zoomed ->
+                    if (page == pagerState.currentPage) {
+                        isCurrentPageZoomed = zoomed
+                    }
                 }
             )
         }
@@ -236,6 +256,12 @@ fun ViewerScreen(
                 },
                 onConfirm = {
                     viewModel.showDeleteDialog()
+                },
+                onClearMarks = {
+                    viewModel.clearMarkedIds()
+                    scope.launch {
+                        settingsRepository.setMarkedIds(emptySet())
+                    }
                 }
             )
         }
@@ -354,6 +380,7 @@ private fun ViewerPhotoPage(
     onTogglePin: () -> Unit,
     onLoadingChanged: (Boolean) -> Unit,
     onMarkToggle: () -> Unit,
+    onZoomStateChanged: (Boolean) -> Unit,
 ) {
     val colors = LocalExtendedColorScheme.current
 
@@ -366,16 +393,27 @@ private fun ViewerPhotoPage(
 
     val colorMatrix = ColorMatrix().apply { setToSaturation(0f) }
 
+    var scale by remember { mutableStateOf(1f) }
+    var offsetX by remember { mutableStateOf(0f) }
+    var offsetY by remember { mutableStateOf(0f) }
+
+    val currentScale by rememberUpdatedState(scale)
+    val currentOffsetX by rememberUpdatedState(offsetX)
+    val currentOffsetY by rememberUpdatedState(offsetY)
+
+    LaunchedEffect(scale) {
+        onZoomStateChanged(scale > 1f)
+    }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .graphicsLayer(
-                alpha = brightness,
-                colorFilter = if (isMarked) ColorFilter.colorMatrix(colorMatrix) else null
-            )
             .combinedClickable(
                 onClick = onToggleHud,
-                onLongClick = onLongPress
+                onLongClick = onLongPress,
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                hapticFeedbackEnabled = false
             )
             .pointerInput(isLongPressing) {
                 if (isLongPressing) {
@@ -391,19 +429,76 @@ private fun ViewerPhotoPage(
                 }
             }
     ) {
-        AsyncImage(
-            model = ImageRequest.Builder(LocalContext.current)
-                .data(displayPhoto.uri)
-                .crossfade(false)
-                .listener(
-                    onSuccess = { _, _ -> onLoadingChanged(false) },
-                    onError = { _, _ -> onLoadingChanged(false) }
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .graphicsLayer(
+                    scaleX = scale,
+                    scaleY = scale,
+                    translationX = offsetX,
+                    translationY = offsetY,
+                    colorFilter = if (isMarked) ColorFilter.colorMatrix(colorMatrix) else null
                 )
-                .build(),
-            contentDescription = displayPhoto.name,
-            contentScale = ContentScale.Fit,
-            modifier = Modifier.fillMaxSize()
-        )
+                .pointerInput(Unit) {
+                    awaitEachGesture {
+                        awaitFirstDown(requireUnconsumed = false)
+                        var zooming = false
+                        var lastSpan = 0f
+                        var lastCentroid = Offset.Zero
+                        while (currentEvent.changes.any { it.pressed }) {
+                            val event = awaitPointerEvent()
+                            val pointers: List<PointerInputChange> = event.changes.filter { it.pressed }
+                            if (pointers.size >= 2) {
+                                zooming = true
+                                val p1 = pointers[0].position
+                                val p2 = pointers[1].position
+                                val span = (p1 - p2).getDistance()
+                                val centroid = (p1 + p2) / 2f
+                                if (lastSpan > 0f) {
+                                    val zoom = span / lastSpan
+                                    val pan = centroid - lastCentroid
+                                    val newScale = (currentScale * zoom).coerceIn(1f, 5f)
+                                    if (newScale == 1f) {
+                                        offsetX = 0f
+                                        offsetY = 0f
+                                    } else {
+                                        offsetX += pan.x
+                                        offsetY += pan.y
+                                    }
+                                    scale = newScale
+                                }
+                                lastSpan = span
+                                lastCentroid = centroid
+                                pointers.forEach { it.consume() }
+                            } else if (zooming || currentScale > 1f) {
+                                val pointer = pointers.firstOrNull()
+                                if (pointer != null) {
+                                    val pan = pointer.positionChange()
+                                    if (pan.x != 0f || pan.y != 0f) {
+                                        offsetX += pan.x
+                                        offsetY += pan.y
+                                        pointer.consume()
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+        ) {
+            AsyncImage(
+                model = ImageRequest.Builder(LocalContext.current)
+                    .data(displayPhoto.uri)
+                    .crossfade(false)
+                    .listener(
+                        onSuccess = { _, _ -> onLoadingChanged(false) },
+                        onError = { _, _ -> onLoadingChanged(false) }
+                    )
+                    .build(),
+                contentDescription = displayPhoto.name,
+                contentScale = ContentScale.Fit,
+                modifier = Modifier.fillMaxSize()
+            )
+        }
 
         if (isLoading) {
             Box(
@@ -419,63 +514,48 @@ private fun ViewerPhotoPage(
             }
         }
 
+        if (isPinned) {
+            Row(
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .padding(top = 48.dp, start = 16.dp)
+                    .clip(RoundedCornerShape(999.dp))
+                    .background(colors.pin.copy(alpha = 0.9f))
+                    .padding(horizontal = 10.dp, vertical = 6.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = CullIcons.Pin,
+                    contentDescription = null,
+                    tint = Color.White,
+                    modifier = Modifier.size(14.dp)
+                )
+                Text(
+                    text = "PINNED",
+                    style = androidx.compose.material3.MaterialTheme.typography.labelLarge.copy(
+                        color = Color.White,
+                        fontSize = 11.sp
+                    )
+                )
+            }
+        }
+
         Box(
             modifier = Modifier
-                .fillMaxWidth()
                 .align(Alignment.TopCenter)
-                .background(
-                    Brush.verticalGradient(
-                        colors = listOf(
-                            Color.Black.copy(alpha = 0.5f),
-                            Color.Transparent
-                        ),
-                        startY = 0f,
-                        endY = 200f
-                    )
-                )
-                .padding(top = 48.dp, bottom = 16.dp, start = 16.dp, end = 16.dp)
+                .padding(top = 48.dp)
+                .clip(RoundedCornerShape(999.dp))
+                .background(Color.Black.copy(alpha = 0.55f))
+                .padding(horizontal = 12.dp, vertical = 6.dp)
         ) {
-            Box(
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .clip(RoundedCornerShape(999.dp))
-                    .background(Color.Black.copy(alpha = 0.55f))
-                    .padding(horizontal = 12.dp, vertical = 6.dp)
-            ) {
-                Text(
-                    text = "${String.format("%04d", index + 1)} / $totalCount",
-                    style = androidx.compose.material3.MaterialTheme.typography.labelLarge.copy(
-                        color = Color.White.copy(alpha = 0.9f),
-                        fontSize = 12.sp
-                    )
+            Text(
+                text = "${String.format("%04d", index + 1)} / $totalCount",
+                style = androidx.compose.material3.MaterialTheme.typography.labelLarge.copy(
+                    color = Color.White.copy(alpha = 0.9f),
+                    fontSize = 12.sp
                 )
-            }
-
-            if (isPinned) {
-                Row(
-                    modifier = Modifier
-                        .align(Alignment.TopStart)
-                        .clip(RoundedCornerShape(999.dp))
-                        .background(colors.pin.copy(alpha = 0.9f))
-                        .padding(horizontal = 10.dp, vertical = 6.dp),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        imageVector = CullIcons.Pin,
-                        contentDescription = null,
-                        tint = Color.White,
-                        modifier = Modifier.size(14.dp)
-                    )
-                    Text(
-                        text = "PINNED",
-                        style = androidx.compose.material3.MaterialTheme.typography.labelLarge.copy(
-                            color = Color.White,
-                            fontSize = 11.sp
-                        )
-                    )
-                }
-            }
+            )
         }
 
         Box(
@@ -504,6 +584,7 @@ private fun HudPill(
     onTogglePin: () -> Unit,
     onToggleMark: () -> Unit,
     onConfirm: () -> Unit,
+    onClearMarks: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val colors = LocalExtendedColorScheme.current
@@ -548,7 +629,13 @@ private fun HudPill(
                     modifier = Modifier
                         .size(40.dp)
                         .clip(CircleShape)
-                        .background(colors.danger.copy(alpha = 0.3f)),
+                        .background(colors.danger.copy(alpha = 0.3f))
+                        .combinedClickable(
+                            onClick = onClearMarks,
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                            hapticFeedbackEnabled = false
+                        ),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
@@ -578,7 +665,12 @@ private fun HudPill(
                         .background(
                             if (isPinned) colors.pin else colors.bgElev.copy(alpha = 0.85f)
                         )
-                        .combinedClickable(onClick = onTogglePin),
+                        .combinedClickable(
+                            onClick = onTogglePin,
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                            hapticFeedbackEnabled = false
+                        ),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
@@ -596,7 +688,12 @@ private fun HudPill(
                         .background(
                             if (isMarked) colors.danger else colors.bgElev.copy(alpha = 0.85f)
                         )
-                        .combinedClickable(onClick = onToggleMark),
+                        .combinedClickable(
+                            onClick = onToggleMark,
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                            hapticFeedbackEnabled = false
+                        ),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
@@ -611,7 +708,12 @@ private fun HudPill(
                     modifier = Modifier
                         .clip(RoundedCornerShape(999.dp))
                         .background(colors.accent)
-                        .combinedClickable(onClick = onConfirm)
+                        .combinedClickable(
+                            onClick = onConfirm,
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                            hapticFeedbackEnabled = false
+                        )
                         .padding(horizontal = 16.dp, vertical = 10.dp)
                 ) {
                     Text(
