@@ -1,0 +1,38 @@
+package com.rrajath.occullt.ui.theme
+
+import androidx.compose.ui.graphics.Color
+
+val DarkBg = Color(0xFF0D0D0F)
+val DarkBgElev = Color(0xFF17171A)
+val DarkBgElev2 = Color(0xFF1F1F23)
+val DarkLine = Color(0x14FFFFFF)
+val DarkLineStrong = Color(0x29FFFFFF)
+val DarkFg = Color(0xFFF3F2EF)
+val DarkFgDim = Color(0xA8F3F2EF)
+val DarkFgFaint = Color(0x61F3F2EF)
+val DarkScrim = Color(0x8C000000)
+
+val LightBg = Color(0xFFF6F4EF)
+val LightBgElev = Color(0xFFFFFFFF)
+val LightBgElev2 = Color(0xFFEEEAE2)
+val LightLine = Color(0x14000000)
+val LightLineStrong = Color(0x29000000)
+val LightFg = Color(0xFF14120E)
+val LightFgDim = Color(0xA314120E)
+val LightFgFaint = Color(0x6614120E)
+val LightScrim = Color(0x8C000000)
+
+val AccentTangerine = Color(0xFFE8854A)
+val AccentTangerineSoft = Color(0xFF3A2318)
+val Accent25 = Color(0xFFE86B4A)
+val Accent25Soft = Color(0xFF3A1C18)
+val Accent150 = Color(0xFF4AE8A0)
+val Accent150Soft = Color(0xFF183A2A)
+val Accent220 = Color(0xFF4AA0E8)
+val Accent220Soft = Color(0xFF182A3A)
+val Accent300 = Color(0xFFA04AE8)
+val Accent300Soft = Color(0xFF2A183A)
+
+val Danger = Color(0xFFD94F35)
+val DangerSoft = Color(0xFF4A1F18)
+val Pin = Color(0xFFF5A060)

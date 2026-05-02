@@ -1,0 +1,432 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>CULL — Android photo culling app</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet"/>
+<style>
+  html, body { margin: 0; padding: 0; background: #f0eee9; color: #14120e;
+    font-family: 'Geist', system-ui, sans-serif; overscroll-behavior: none; }
+  * { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+  @keyframes cull-spin { to { transform: rotate(360deg); } }
+  @keyframes cull-pulse { 0%,100% { opacity: 0.85; } 50% { opacity: 1; } }
+</style>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel" src="frames/design-canvas.jsx"></script>
+<script type="text/babel" src="components/icons.jsx"></script>
+<script type="text/babel" src="components/photos.jsx"></script>
+<script type="text/babel" src="components/theme.jsx"></script>
+<script type="text/babel" src="components/app-icons.jsx"></script>
+<script type="text/babel" src="components/chrome.jsx"></script>
+<script type="text/babel" src="screens/home.jsx"></script>
+<script type="text/babel" src="screens/library.jsx"></script>
+<script type="text/babel" src="screens/viewer.jsx"></script>
+<script type="text/babel" src="screens/settings.jsx"></script>
+<script type="text/babel" src="screens/live-viewer.jsx"></script>
+
+<script type="text/babel" data-presets="react">
+
+const TWEAKS = /*EDITMODE-BEGIN*/{
+  "dark": true,
+  "accentHue": 40,
+  "hudStyle": "pill",
+  "pinStyle": "badge",
+  "dryRun": true,
+  "showMarked": false
+}/*EDITMODE-END*/;
+
+function App() {
+  const [tweaks, setTweaks] = React.useState(TWEAKS);
+  const [tweakOpen, setTweakOpen] = React.useState(false);
+
+  // listen for edit mode activation
+  React.useEffect(() => {
+    const onMsg = (e) => {
+      if (!e.data) return;
+      if (e.data.type === '__activate_edit_mode') setTweakOpen(true);
+      if (e.data.type === '__deactivate_edit_mode') setTweakOpen(false);
+    };
+    window.addEventListener('message', onMsg);
+    window.parent.postMessage({ type: '__edit_mode_available' }, '*');
+    return () => window.removeEventListener('message', onMsg);
+  }, []);
+
+  const updateTweak = (patch) => {
+    const merged = { ...tweaks, ...patch };
+    setTweaks(merged);
+    window.parent.postMessage({ type: '__edit_mode_set_keys', edits: patch }, '*');
+  };
+
+  const t = React.useMemo(() => {
+    const th = makeTheme({ dark: tweaks.dark, accentHue: tweaks.accentHue });
+    th.hudStyle = tweaks.hudStyle;
+    th.pinStyle = tweaks.pinStyle;
+    return th;
+  }, [tweaks]);
+
+  // ─── Canvas layout ─────────────────────────────────────────────────
+  return (
+    <>
+      <DesignCanvas>
+
+        {/* Intro + brand */}
+        <div style={{ padding: '0 60px 40px', maxWidth: 980 }}>
+          <div style={{
+            fontFamily: '"Instrument Serif", serif', fontStyle: 'italic',
+            fontSize: 88, lineHeight: 0.9, letterSpacing: -2,
+            color: '#14120e',
+          }}>
+            Cull<span style={{ fontFamily: 'Geist', fontStyle: 'normal', fontWeight: 700, fontSize: 44, verticalAlign: 'top', marginLeft: 14, letterSpacing: -1, color: 'oklch(0.62 0.19 40)' }}>»</span>
+            {'\n'}An Android photo-culling app built around one action: pin a reference, long-press to compare. Small name, single syllable, hard consonants — earns its keep on a Home screen icon.
+            {'\n'}Material You Expressive
+            {'\n'}Dark-first · photos are the hero
+            {'\n'}Instrument Serif display · Geist UI
+            {'\n'}Bold accent · oklch tangerine
+          </div>
+          <div style={{ fontSize: 15, color: 'rgba(60,50,40,0.7)', maxWidth: 560, marginTop: 8, lineHeight: 1.45 }}>
+            An Android photo-culling app built around one action: pin a reference, long-press to compare.
+            Small name, single syllable, hard consonants — earns its keep on a Home&nbsp;screen icon.
+          </div>
+          <div style={{ display: 'flex', gap: 14, marginTop: 22, flexWrap: 'wrap' }}>
+            {['Material You Expressive', 'Dark-first · photos are the hero', 'Instrument Serif display · Geist UI', 'Bold accent · oklch tangerine'].map(chip => (
+              <div key={chip} style={{
+                background: '#fff', border: '1px solid rgba(0,0,0,0.08)',
+                padding: '8px 14px', borderRadius: 999, fontSize: 12, fontWeight: 500,
+                color: 'rgba(40,30,20,0.85)',
+              }}>{chip}</div>
+            ))}
+          </div>
+        </div>
+
+        {/* Section · App icon variations */}
+        <DCSection title="App icon · variations" subtitle="Same squircle canvas, same accent hue. v1 is the current “Cull»” wordmark.">
+          <div style={{ display: 'flex', gap: 56, padding: '8px 8px 0', flexWrap: 'nowrap' }}>
+            <IconTile size={156} bg="#1a1612" label="v1 · Cull»" caption="Current. Wordmark lockup — serif italic + guillemet in the accent.">
+              <IconV1_Wordmark size={156}/>
+            </IconTile>
+            <IconTile size={156}
+              bg="radial-gradient(circle at 30% 25%, #2a2520 0%, #0e0b08 100%)"
+              label="v2 · Pin"
+              caption="The product’s core interaction as a glyph. Reads clearly at 24dp.">
+              <IconV2_Pin size={156}/>
+            </IconTile>
+            <IconTile size={156}
+              bg="linear-gradient(135deg, #1a1612 0%, #2a1f18 100%)"
+              label="v3 · Two frames"
+              caption="The compare gesture — pinned reference layered over the current photo.">
+              <IconV3_Frames size={156}/>
+            </IconTile>
+            <IconTile size={156} bg="#1a1612" label="v4 · Monogram C»" caption="Maximally reductive single-glyph lockup.">
+              <IconV4_Mono size={156}/>
+            </IconTile>
+            <IconTile size={156}
+              bg="linear-gradient(160deg, #1a1612 0%, #231b14 100%)"
+              label="v5 · Stack"
+              caption="Keep-the-top-one metaphor. Stack of cards, accent ring on the pick.">
+              <IconV5_Stack size={156}/>
+            </IconTile>
+          </div>
+
+          {/* scale test — each icon at launcher sizes */}
+          <div style={{ padding: '36px 8px 0' }}>
+            <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1.4, textTransform: 'uppercase', color: 'rgba(60,50,40,0.65)', marginBottom: 14 }}>
+              Scale test · 192 / 96 / 48 / 24 dp
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+              {[
+                ['v1', (s) => <div style={{ width: s, height: s, borderRadius: SQUIRCLE_MAIN(s), background: '#1a1612', position: 'relative', overflow: 'hidden' }}><IconV1_Wordmark size={s}/></div>],
+                ['v2', (s) => <div style={{ width: s, height: s, borderRadius: SQUIRCLE_MAIN(s), background: 'radial-gradient(circle at 30% 25%, #2a2520 0%, #0e0b08 100%)', position: 'relative', overflow: 'hidden' }}><IconV2_Pin size={s}/></div>],
+                ['v3', (s) => <div style={{ width: s, height: s, borderRadius: SQUIRCLE_MAIN(s), background: 'linear-gradient(135deg, #1a1612 0%, #2a1f18 100%)', position: 'relative', overflow: 'hidden' }}><IconV3_Frames size={s}/></div>],
+                ['v4', (s) => <div style={{ width: s, height: s, borderRadius: SQUIRCLE_MAIN(s), background: '#1a1612', position: 'relative', overflow: 'hidden' }}><IconV4_Mono size={s}/></div>],
+                ['v5', (s) => <div style={{ width: s, height: s, borderRadius: SQUIRCLE_MAIN(s), background: 'linear-gradient(160deg, #1a1612 0%, #231b14 100%)', position: 'relative', overflow: 'hidden' }}><IconV5_Stack size={s}/></div>],
+              ].map(([name, render]) => (
+                <div key={name} style={{ display: 'flex', alignItems: 'center', gap: 24 }}>
+                  <div style={{ width: 24, fontSize: 12, fontWeight: 700, color: 'rgba(40,30,20,0.6)', fontFamily: 'Geist' }}>{name}</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 28 }}>
+                    {[192, 96, 48, 24].map(s => render(s))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <DCPostIt top={-14} right={140} rotate={3}>
+            Icons share accent hue + ink background so a family swap keeps the
+            rest of the UI untouched. v4 is the favicon if we need a small-scale
+            fallback.
+          </DCPostIt>
+        </DCSection>
+
+        {/* Section 0 — Source variations (NEW) */}
+        <DCSection title="00 · Source mode" subtitle="Pick one: cull a device folder, cull Immich directly, or hybrid (device → mirror to Immich).">
+          <DCArtboard label="Home · Local only" width={392} height={832}>
+            <Phone t={t}><HomeScreen t={t} source="local"/></Phone>
+          </DCArtboard>
+          <DCArtboard label="Home · Immich only" width={392} height={832}>
+            <Phone t={t}><HomeScreen t={t} source="immich"/></Phone>
+          </DCArtboard>
+          <DCArtboard label="Home · Local + Immich (hybrid)" width={392} height={832}>
+            <Phone t={t}><HomeScreen t={t} source="hybrid" hasContinue/></Phone>
+          </DCArtboard>
+          <DCArtboard label="Library · Immich source header" width={392} height={832}>
+            <Phone t={t}><LibraryScreen t={t} source="immich" marks={{ 0: 'pinned', 5: 'deleted', 11: 'deleted' }}/></Phone>
+          </DCArtboard>
+          <DCArtboard label="Library · Local source header" width={392} height={832}>
+            <Phone t={t}><LibraryScreen t={t} source="local" marks={{ 0: 'pinned', 5: 'deleted', 11: 'deleted' }}/></Phone>
+          </DCArtboard>
+
+          <DCPostIt top={-14} left={420} rotate={-3}>
+            Source mode is persistent. Immich-only drops the "On Immich" chip
+            (redundant) and the Mirror-deletes toggle. Local-only hides the
+            cloud chip entirely.
+          </DCPostIt>
+        </DCSection>
+
+        {/* Section 1 — primary flow */}
+        <DCSection title="01 · Primary flow" subtitle="Home → Library → Viewer. The thumb-path for 90% of sessions.">
+          <DCArtboard label="Home · first-run (no continue)" width={392} height={832}>
+            <Phone t={t}><HomeScreen t={t}/></Phone>
+          </DCArtboard>
+          <DCArtboard label="Home · with “Continue where you left off”" width={392} height={832}>
+            <Phone t={t}><HomeScreen t={t} hasContinue/></Phone>
+          </DCArtboard>
+          <DCArtboard label="Library · 3-col thumbnail grid with marks" width={392} height={832}>
+            <Phone t={t}><LibraryScreen t={t} marks={{ 0: 'pinned', 5: 'deleted', 11: 'deleted', 14: 'deleted' }}/></Phone>
+          </DCArtboard>
+          <DCArtboard label="Viewer · idle, HUD closed" width={392} height={832}>
+            <Phone t={t}><ViewerScreen t={t} photo={PHOTOS[2]} pinnedPhoto={PHOTOS[0]} hudOpen={false}/></Phone>
+          </DCArtboard>
+
+          <DCPostIt top={-14} left={420}>
+            Tap anywhere in the viewer → HUD. Single-tap it closed again.
+            Everything else is gesture.
+          </DCPostIt>
+        </DCSection>
+
+        {/* Section 2 — viewer states */}
+        <DCSection title="02 · Viewer states" subtitle="Each of the five culling moments, one artboard each.">
+          <DCArtboard label="a · HUD open" width={392} height={832}>
+            <Phone t={t}><ViewerScreen t={t} photo={PHOTOS[2]} pinnedPhoto={PHOTOS[0]} hudOpen={true} pinned={false} cloudMissing={false}/></Phone>
+          </DCArtboard>
+          <DCArtboard label="b · This photo is pinned" width={392} height={832}>
+            <Phone t={t}><ViewerScreen t={t} photo={PHOTOS[0]} pinnedPhoto={PHOTOS[0]} hudOpen={true} pinned={true}/></Phone>
+          </DCArtboard>
+          <DCArtboard label="c · Long-press · showing pinned" width={392} height={832}>
+            <Phone t={t}><ViewerScreen t={t} photo={PHOTOS[2]} pinnedPhoto={PHOTOS[0]} state="long-press"/></Phone>
+          </DCArtboard>
+          <DCArtboard label="d · Swipe-down · marked for deletion" width={392} height={832}>
+            <Phone t={t}><ViewerScreen t={t} photo={PHOTOS[2]} pinnedPhoto={PHOTOS[0]} state="marked" hudOpen={false}/></Phone>
+          </DCArtboard>
+          <DCArtboard label="e · Zoomed · Reset Both Zooms visible" width={392} height={832}>
+            <Phone t={t}><ViewerScreen t={t} photo={PHOTOS[2]} pinnedPhoto={PHOTOS[0]} state="zoomed" hudOpen={false}/></Phone>
+          </DCArtboard>
+          <DCArtboard label="f · Long-press on pinned · toast" width={392} height={832}>
+            <Phone t={t}><ViewerScreen t={t} photo={PHOTOS[0]} pinnedPhoto={PHOTOS[0]} hudOpen={false} pinned={true} showToast="Cannot compare a pinned image against itself"/></Phone>
+          </DCArtboard>
+          <DCArtboard label="g · Cloud-missing · Immich slash icon" width={392} height={832}>
+            <Phone t={t}><ViewerScreen t={t} photo={PHOTOS[7]} pinnedPhoto={PHOTOS[0]} hudOpen={true} cloudMissing={true}/></Phone>
+          </DCArtboard>
+          <DCArtboard label="h · Loading full-res" width={392} height={832}>
+            <Phone t={t}><ViewerScreen t={t} photo={PHOTOS[3]} pinnedPhoto={PHOTOS[0]} state="loading" hudOpen={false}/></Phone>
+          </DCArtboard>
+
+          <DCPostIt top={-14} right={100} rotate={3}>
+            Long-press suppresses the system context menu (per spec). The
+            pinned pin icon gets its own glowing badge so you never lose it.
+          </DCPostIt>
+        </DCSection>
+
+        {/* Section 3 — variations */}
+        <DCSection title="03 · Variations" subtitle="HUD layout, pin style, home hero, swipe-mark treatment. Mix-and-match via Tweaks.">
+          <DCArtboard label="HUD · v1 Pill (default)" width={392} height={832}>
+            <Phone t={{...t, hudStyle:'pill'}}><ViewerScreen t={{...t, hudStyle:'pill'}} photo={PHOTOS[4]} pinnedPhoto={PHOTOS[0]} hudOpen/></Phone>
+          </DCArtboard>
+          <DCArtboard label="HUD · v2 Side rail (thumb-reachable)" width={392} height={832}>
+            <Phone t={{...t, hudStyle:'rail'}}><ViewerScreen t={{...t, hudStyle:'rail'}} photo={PHOTOS[4]} pinnedPhoto={PHOTOS[0]} hudOpen/></Phone>
+          </DCArtboard>
+          <DCArtboard label="HUD · v3 Full-width bar" width={392} height={832}>
+            <Phone t={{...t, hudStyle:'bar'}}><ViewerScreen t={{...t, hudStyle:'bar'}} photo={PHOTOS[4]} pinnedPhoto={PHOTOS[0]} hudOpen/></Phone>
+          </DCArtboard>
+          <DCArtboard label="Home · v2 bolder type-driven" width={392} height={832}>
+            <Phone t={t}><HomeScreenV2 t={t}/></Phone>
+          </DCArtboard>
+          <DCArtboard label="Mark-for-delete · v2 corner ribbon" width={392} height={832}>
+            <Phone t={t}><ViewerScreen t={t} photo={PHOTOS[3]} pinnedPhoto={PHOTOS[0]} state="marked-ribbon" hudOpen={false}/></Phone>
+          </DCArtboard>
+        </DCSection>
+
+        {/* Section 4 — supporting screens */}
+        <DCSection title="04 · Supporting screens" subtitle="Settings + delete-confirm dialog.">
+          <DCArtboard label="Settings · Hybrid source · accent picker" width={392} height={832}>
+            <Phone t={t}><SettingsScreen t={t} dryRun={tweaks.dryRun} source="hybrid" accentHue={tweaks.accentHue} onHueChange={(h) => updateTweak({ accentHue: h })}/></Phone>
+          </DCArtboard>
+          <DCArtboard label="Settings · Immich-only source" width={392} height={832}>
+            <Phone t={t}><SettingsScreen t={t} dryRun={tweaks.dryRun} source="immich" accentHue={tweaks.accentHue} onHueChange={(h) => updateTweak({ accentHue: h })}/></Phone>
+          </DCArtboard>
+          <DCArtboard label="Delete confirm · 1 local + 2 on Immich" width={392} height={832}>
+            <Phone t={t}>
+              <ViewerScreen t={t} photo={PHOTOS[2]} pinnedPhoto={PHOTOS[0]} hudOpen={true}/>
+              <ConfirmDialog t={t}/>
+            </Phone>
+          </DCArtboard>
+          <DCArtboard label="Delete confirm · dry-run toast" width={392} height={832}>
+            <Phone t={t}><ViewerScreen t={t} photo={PHOTOS[2]} pinnedPhoto={PHOTOS[0]} hudOpen={false} showToast="Dry run mode enabled. No photos were deleted"/></Phone>
+          </DCArtboard>
+        </DCSection>
+
+        {/* Section 5 — LIVE prototype */}
+        <DCSection title="05 · Live prototype" subtitle="Try it: tap the screen for HUD · ← → swipe photos · ↓ swipe to mark · hold to compare against the pinned photo.">
+          <DCArtboard label="Interactive · touch it" width={392} height={832}>
+            <Phone t={t}>
+              <StatusBar t={t} tint="#fff"/>
+              <LiveViewer t={t}/>
+              <NavBar t={t} tint="#fff"/>
+            </Phone>
+          </DCArtboard>
+          <DCPostIt top={-14} left={420} rotate={-3}>
+            Long-press threshold = 220ms (matches Settings default). Try holding
+            on photo 1 — it IS the pinned one, so you'll see the toast.
+          </DCPostIt>
+        </DCSection>
+
+        {/* Footer */}
+        <div style={{ padding: '0 60px 80px', color: 'rgba(60,50,40,0.55)', fontSize: 12, maxWidth: 700 }}>
+          <div style={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1.4, marginBottom: 8, color: 'rgba(40,30,20,0.75)' }}>
+            Notes
+          </div>
+          Photo placeholders are CSS gradients; swap for real imagery in-repo.
+          All chrome/icons are hand-rolled (no Material icon fonts pulled in).
+          Toggle the Tweaks panel (toolbar) to try light theme, accent hue, HUD style, pin style, dry run.
+        </div>
+
+      </DesignCanvas>
+
+      {tweakOpen && <TweaksPanel tweaks={tweaks} update={updateTweak}/>}
+    </>
+  );
+}
+
+// Alt home — one of the requested variations
+function HomeScreenV2({ t }) {
+  return (
+    <>
+      <StatusBar t={t}/>
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: '16px 20px 20px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <CullMark size={28} color={t.fg}/>
+          <div style={{ width: 40, height: 40, borderRadius: 999, background: t.bgElev, border: `1px solid ${t.line}`, display:'flex', alignItems:'center', justifyContent:'center', color: t.fgDim }}>
+            <ISettings size={18}/>
+          </div>
+        </div>
+        <div style={{
+          fontFamily: t.display, fontStyle: 'italic',
+          fontSize: 120, lineHeight: 0.88, letterSpacing: -4,
+          marginTop: 20, color: t.fg,
+        }}>
+          cull<br/>
+          <span style={{ color: t.accent }}>mode</span>
+        </div>
+        <div style={{
+          display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10,
+          marginTop: 'auto',
+        }}>
+          <div style={{
+            gridColumn: '1 / -1',
+            background: t.accent, color: t.dark ? '#0d0d0f' : '#fff',
+            borderRadius: 28, padding: '22px 22px 20px',
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          }}>
+            <div>
+              <div style={{ fontFamily: t.display, fontStyle: 'italic', fontSize: 40, lineHeight: 1, letterSpacing: -1 }}>Library</div>
+              <div style={{ fontSize: 12, opacity: 0.72, marginTop: 4, fontVariantNumeric: 'tabular-nums' }}>1,208 photos · IMG_2020</div>
+            </div>
+            <div style={{ width: 48, height: 48, borderRadius: 999, background: 'rgba(13,13,15,0.14)', display:'flex', alignItems:'center', justifyContent:'center' }}>
+              <IArrow size={22}/>
+            </div>
+          </div>
+          <div style={{
+            background: t.bgElev, border: `1px solid ${t.line}`, color: t.fgDim,
+            borderRadius: 24, padding: '18px 18px 16px',
+            opacity: 0.6,
+          }}>
+            <div style={{ fontFamily: t.display, fontStyle: 'italic', fontSize: 26, lineHeight: 1, color: t.fg }}>Albums</div>
+            <div style={{ fontSize: 11, marginTop: 4 }}>Soon</div>
+          </div>
+          <div style={{
+            background: t.bgElev, border: `1px solid ${t.line}`,
+            borderRadius: 24, padding: '18px 18px 16px',
+          }}>
+            <div style={{ fontFamily: t.display, fontStyle: 'italic', fontSize: 26, lineHeight: 1, color: t.fg }}>Settings</div>
+            <div style={{ fontSize: 11, color: t.fgDim, marginTop: 4 }}>Immich, folder, dry run</div>
+          </div>
+        </div>
+      </div>
+      <NavBar t={t}/>
+    </>
+  );
+}
+
+// Tweaks panel
+function TweaksPanel({ tweaks, update }) {
+  return (
+    <div style={{
+      position: 'fixed', right: 16, bottom: 16, width: 290, zIndex: 1000,
+      background: '#fff', border: '1px solid rgba(0,0,0,0.12)',
+      borderRadius: 20, boxShadow: '0 20px 60px rgba(0,0,0,0.22)',
+      padding: 16, fontFamily: 'Geist, system-ui, sans-serif',
+      color: '#14120e',
+    }}>
+      <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: 1.4, textTransform: 'uppercase', color: 'oklch(0.62 0.19 40)', marginBottom: 10 }}>
+        Tweaks
+      </div>
+      <TwLabel>Theme</TwLabel>
+      <TwSegs value={tweaks.dark ? 'Dark' : 'Light'} opts={['Dark','Light']} onChange={v => update({ dark: v==='Dark' })}/>
+      <TwLabel>Accent hue</TwLabel>
+      <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
+        {[40, 25, 150, 220, 300].map(h => (
+          <div key={h} onClick={() => update({ accentHue: h })} style={{
+            width: 32, height: 32, borderRadius: 999, cursor: 'pointer',
+            background: `oklch(0.74 0.18 ${h})`,
+            boxShadow: tweaks.accentHue === h ? '0 0 0 2px #14120e' : 'none',
+          }}/>
+        ))}
+      </div>
+      <TwLabel>HUD style</TwLabel>
+      <TwSegs value={tweaks.hudStyle} opts={['pill','rail','bar']} onChange={v => update({ hudStyle: v })}/>
+      <TwLabel>Pin indicator</TwLabel>
+      <TwSegs value={tweaks.pinStyle} opts={['badge','ribbon','corner']} onChange={v => update({ pinStyle: v })}/>
+      <TwLabel>Dry run</TwLabel>
+      <TwSegs value={tweaks.dryRun ? 'on' : 'off'} opts={['on','off']} onChange={v => update({ dryRun: v==='on' })}/>
+    </div>
+  );
+}
+const TwLabel = ({ children }) => <div style={{ fontSize: 11, fontWeight: 600, color: 'rgba(40,30,20,0.7)', margin: '10px 0 6px' }}>{children}</div>;
+const TwSegs = ({ value, opts, onChange }) => (
+  <div style={{ display: 'flex', gap: 4, background: '#f0eee9', padding: 3, borderRadius: 10 }}>
+    {opts.map(o => (
+      <div key={o} onClick={() => onChange(o)} style={{
+        flex: 1, textAlign: 'center', padding: '6px 8px', borderRadius: 8,
+        fontSize: 12, fontWeight: 600, cursor: 'pointer',
+        background: value === o ? '#fff' : 'transparent',
+        color: value === o ? '#14120e' : 'rgba(40,30,20,0.6)',
+        boxShadow: value === o ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+        textTransform: 'capitalize',
+      }}>{o}</div>
+    ))}
+  </div>
+);
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>
