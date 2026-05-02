@@ -43,6 +43,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.rrajath.occullt.core.datastore.SettingsRepository
+import com.rrajath.occullt.core.network.ImmichApi
 import com.rrajath.occullt.ui.component.CircleIcon
 import com.rrajath.occullt.ui.component.SectionLabel
 import com.rrajath.occullt.ui.component.SliderRow
@@ -301,10 +302,26 @@ fun SettingsScreen(
                                     .clip(RoundedCornerShape(999.dp))
                                     .background(colors.accentSoft)
                                     .clickable {
+                                        if (immichUrl.isBlank() || immichApiKey.isBlank()) {
+                                            connectionStatus = "URL and API key required"
+                                            return@clickable
+                                        }
                                         connectionStatus = "Testing..."
                                         scope.launch {
-                                            kotlinx.coroutines.delay(1000)
-                                            connectionStatus = "Not implemented yet"
+                                            try {
+                                                val api = ImmichApi(immichUrl, immichApiKey)
+                                                val result = api.getServerAbout()
+                                                result.fold(
+                                                    onSuccess = { info ->
+                                                        connectionStatus = "Connected (${info.version})"
+                                                    },
+                                                    onFailure = { error ->
+                                                        connectionStatus = "Failed: ${error.message}"
+                                                    }
+                                                )
+                                            } catch (e: Exception) {
+                                                connectionStatus = "Error: ${e.message}"
+                                            }
                                         }
                                     }
                                     .padding(horizontal = 14.dp, vertical = 8.dp)
