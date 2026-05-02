@@ -256,4 +256,36 @@ class ImmichApi(
             Result.failure(Exception("Error: ${e.message ?: e.javaClass.simpleName}"))
         }
     }
+
+    suspend fun checkAssetExists(fileName: String, dateModifiedMs: Long): Result<Boolean> = withContext(Dispatchers.IO) {
+        try {
+            val url = "$baseUrl/api/search/metadata?originalFileName=$fileName&type=IMAGE&size=1"
+
+            val request = Request.Builder()
+                .url(url)
+                .addHeader("x-api-key", apiKey)
+                .get()
+                .build()
+
+            val response = client.newCall(request).execute()
+            val body = response.body?.string()
+
+            if (!response.isSuccessful) {
+                Result.failure(Exception("HTTP ${response.code}: ${response.message}"))
+            } else if (body.isNullOrEmpty()) {
+                Result.success(false)
+            } else {
+                runCatching {
+                    val jsonElement = Json.parseToJsonElement(body)
+                    val jsonObject = jsonElement as? JsonObject
+                    val assets = jsonObject?.get("assets")?.jsonArray
+                    assets != null && assets.isNotEmpty()
+                }
+            }
+        } catch (e: IOException) {
+            Result.failure(Exception("Network error: ${e.message ?: e.javaClass.simpleName}"))
+        } catch (e: Exception) {
+            Result.failure(Exception("Error: ${e.message ?: e.javaClass.simpleName}"))
+        }
+    }
 }

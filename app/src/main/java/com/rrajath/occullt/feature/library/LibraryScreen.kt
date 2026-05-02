@@ -132,7 +132,14 @@ fun LibraryScreen(
                 val subtitle = when {
                     state.isLoading -> "Loading..."
                     state.error != null -> state.error!!
-                    else -> "${state.photos.size} photos"
+                    else -> {
+                        val sourceLabel = when (state.sourceMode) {
+                            SourceMode.Local -> "Local"
+                            SourceMode.Immich -> "Immich"
+                            SourceMode.Hybrid -> "Hybrid"
+                        }
+                        "${state.photos.size} photos · $sourceLabel"
+                    }
                 }
                 Text(
                     text = subtitle,
@@ -271,25 +278,6 @@ fun LibraryScreen(
                                     contentDescription = "Marked for deletion",
                                     tint = Color.White,
                                     modifier = Modifier.size(12.dp)
-                                )
-                            }
-                        }
-
-                        if (photo.source == PhotoSource.Immich || state.sourceMode == SourceMode.Hybrid) {
-                            Box(
-                                modifier = Modifier
-                                    .align(Alignment.BottomEnd)
-                                    .padding(4.dp)
-                                    .clip(RoundedCornerShape(999.dp))
-                                    .background(Color.Black.copy(alpha = 0.6f))
-                                    .padding(horizontal = 6.dp, vertical = 3.dp)
-                            ) {
-                                Text(
-                                    text = if (photo.source == PhotoSource.Immich) "Cloud" else "Local",
-                                    style = androidx.compose.material3.MaterialTheme.typography.labelLarge.copy(
-                                        color = Color.White.copy(alpha = 0.9f),
-                                        fontSize = 9.sp
-                                    )
                                 )
                             }
                         }

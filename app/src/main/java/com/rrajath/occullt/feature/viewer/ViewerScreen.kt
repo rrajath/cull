@@ -163,9 +163,28 @@ fun ViewerScreen(
     LaunchedEffect(pagerState.currentPage) {
         viewModel.setCurrentIndex(pagerState.currentPage)
         viewModel.setLoading(false)
+        viewModel.setIsOnImmich(null)
         val currentPhoto = photos.getOrNull(pagerState.currentPage)
         if (currentPhoto != null) {
             viewModel.setIsMarked(state.markedIds.contains(currentPhoto.id))
+            if (currentPhoto.source == PhotoSource.Local) {
+                val sourceMode = settingsRepository.sourceMode.first()
+                val immichUrl = settingsRepository.immichUrl.first()
+                val immichApiKey = settingsRepository.immichApiKey.first()
+                if (sourceMode != SourceMode.Local && !immichUrl.isNullOrBlank() && !immichApiKey.isNullOrBlank()) {
+                    launch {
+                        val immichApi = ImmichApi(immichUrl, immichApiKey)
+                        val result = immichApi.checkAssetExists(currentPhoto.name, currentPhoto.dateModified)
+                        if (result.isSuccess) {
+                            viewModel.setIsOnImmich(result.getOrNull() == true)
+                        } else {
+                            viewModel.setIsOnImmich(false)
+                        }
+                    }
+                }
+            } else {
+                viewModel.setIsOnImmich(true)
+            }
         }
     }
 
@@ -201,6 +220,8 @@ fun ViewerScreen(
                 pinnedPhoto = pinnedPhoto,
                 isLoading = state.isLoading,
                 isMarked = state.isMarked,
+                isOnImmich = state.isOnImmich,
+                showPinnedBadge = isPinned || (state.isLongPressing && state.pinnedId == pinnedPhoto?.id),
                 sourceMode = photos.getOrNull(pagerState.currentPage)?.source ?: PhotoSource.Local,
                 onToggleHud = { viewModel.toggleHud() },
                 onLongPress = {
@@ -387,6 +408,8 @@ private fun ViewerPhotoPage(
     pinnedPhoto: UnifiedPhotoItem?,
     isLoading: Boolean,
     isMarked: Boolean,
+    isOnImmich: Boolean?,
+    showPinnedBadge: Boolean,
     sourceMode: PhotoSource,
     onToggleHud: () -> Unit,
     onLongPress: () -> Unit,
@@ -533,7 +556,7 @@ private fun ViewerPhotoPage(
             }
         }
 
-        if (isPinned) {
+        if (showPinnedBadge) {
             Row(
                 modifier = Modifier
                     .align(Alignment.TopStart)
@@ -575,6 +598,24 @@ private fun ViewerPhotoPage(
                     fontSize = 12.sp
                 )
             )
+        }
+
+        if (isOnImmich != null) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(end = 16.dp, bottom = 72.dp)
+                    .clip(CircleShape)
+                    .background(Color.Black.copy(alpha = 0.55f))
+                    .padding(8.dp)
+            ) {
+                Icon(
+                    imageVector = if (isOnImmich) CullIcons.Cloud else CullIcons.CloudOff,
+                    contentDescription = if (isOnImmich) "Available on Immich" else "Not on Immich",
+                    tint = Color.White.copy(alpha = 0.8f),
+                    modifier = Modifier.size(18.dp)
+                )
+            }
         }
 
         Box(

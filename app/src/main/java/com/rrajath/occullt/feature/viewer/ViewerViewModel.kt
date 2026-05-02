@@ -18,6 +18,7 @@ data class ViewerState(
     val showDeleteDialog: Boolean = false,
     val isDeleting: Boolean = false,
     val deleteSuccess: Boolean = false,
+    val isOnImmich: Boolean? = null,
 )
 
 class ViewerViewModel : ViewModel() {
@@ -90,5 +91,9 @@ class ViewerViewModel : ViewModel() {
             isMarked = false,
             showDeleteDialog = false
         )
+    }
+
+    fun setIsOnImmich(onImmich: Boolean?) {
+        _state.value = _state.value.copy(isOnImmich = onImmich)
     }
 }
