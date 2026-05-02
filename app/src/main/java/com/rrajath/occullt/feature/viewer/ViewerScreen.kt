@@ -53,6 +53,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -71,7 +72,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withTimeoutOrNull
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -136,6 +136,9 @@ fun ViewerScreen(
 
     val pagerState = rememberPagerState(initialPage = photoIndex.coerceIn(0, photos.size - 1)) { photos.size }
 
+    val currentPhoto = photos.getOrNull(pagerState.currentPage)
+    val isCurrentPinned = currentPhoto?.let { state.pinnedId == it.id } ?: false
+
     LaunchedEffect(pagerState.currentPage) {
         viewModel.setCurrentIndex(pagerState.currentPage)
         viewModel.setLoading(false)
@@ -182,7 +185,7 @@ fun ViewerScreen(
                         viewModel.setLongPressing(true)
                     }
                 },
-                onRelease = {
+                onLongPressRelease = {
                     viewModel.setLongPressing(false)
                 },
                 onTogglePin = {
@@ -210,7 +213,7 @@ fun ViewerScreen(
         ) {
             HudPill(
                 markedCount = state.markedIds.size,
-                isPinned = state.pinnedId != null,
+                isPinned = isCurrentPinned,
                 isMarked = state.isMarked,
                 onTogglePin = {
                     val currentPhoto = photos.getOrNull(pagerState.currentPage)
@@ -347,13 +350,12 @@ private fun ViewerPhotoPage(
     isMarked: Boolean,
     onToggleHud: () -> Unit,
     onLongPress: () -> Unit,
-    onRelease: () -> Unit,
+    onLongPressRelease: () -> Unit,
     onTogglePin: () -> Unit,
     onLoadingChanged: (Boolean) -> Unit,
     onMarkToggle: () -> Unit,
 ) {
     val colors = LocalExtendedColorScheme.current
-    val scope = rememberCoroutineScope()
 
     val displayPhoto = if (isShowingPinned && pinnedPhoto != null) pinnedPhoto else photo
 
@@ -371,22 +373,22 @@ private fun ViewerPhotoPage(
                 alpha = brightness,
                 colorFilter = if (isMarked) ColorFilter.colorMatrix(colorMatrix) else null
             )
-            .pointerInput(Unit) {
-                detectTapGestures(
-                    onPress = {
-                        val released = withTimeoutOrNull(350L) {
-                            tryAwaitRelease()
-                        }
-                        if (released == true) {
-                            onRelease()
-                            onToggleHud()
-                        } else {
-                            onLongPress()
-                            tryAwaitRelease()
-                            onRelease()
+            .combinedClickable(
+                onClick = onToggleHud,
+                onLongClick = onLongPress
+            )
+            .pointerInput(isLongPressing) {
+                if (isLongPressing) {
+                    awaitPointerEventScope {
+                        while (true) {
+                            val event = awaitPointerEvent(PointerEventPass.Initial)
+                            if (event.changes.none { it.pressed }) {
+                                onLongPressRelease()
+                                break
+                            }
                         }
                     }
-                )
+                }
             }
     ) {
         AsyncImage(
