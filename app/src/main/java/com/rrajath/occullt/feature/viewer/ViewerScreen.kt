@@ -16,7 +16,6 @@ import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -51,6 +50,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
@@ -70,6 +71,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -150,9 +152,7 @@ fun ViewerScreen(
     ) {
         HorizontalPager(
             state = pagerState,
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(horizontal = 24.dp),
-            pageSpacing = 16.dp
+            modifier = Modifier.fillMaxSize()
         ) { page ->
             val photo = photos[page]
             val isPinned = state.pinnedId == photo.id
@@ -353,6 +353,7 @@ private fun ViewerPhotoPage(
     onMarkToggle: () -> Unit,
 ) {
     val colors = LocalExtendedColorScheme.current
+    val scope = rememberCoroutineScope()
 
     val displayPhoto = if (isShowingPinned && pinnedPhoto != null) pinnedPhoto else photo
 
@@ -361,20 +362,29 @@ private fun ViewerPhotoPage(
         label = "brightness"
     )
 
+    val colorMatrix = ColorMatrix().apply { setToSaturation(0f) }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .graphicsLayer(alpha = brightness)
-            .combinedClickable(
-                onClick = onToggleHud,
-                onLongClick = onLongPress
+            .graphicsLayer(
+                alpha = brightness,
+                colorFilter = if (isMarked) ColorFilter.colorMatrix(colorMatrix) else null
             )
             .pointerInput(Unit) {
                 detectTapGestures(
                     onPress = {
-                        onLongPress()
-                        tryAwaitRelease()
-                        onRelease()
+                        val released = withTimeoutOrNull(350L) {
+                            tryAwaitRelease()
+                        }
+                        if (released == true) {
+                            onRelease()
+                            onToggleHud()
+                        } else {
+                            onLongPress()
+                            tryAwaitRelease()
+                            onRelease()
+                        }
                     }
                 )
             }
