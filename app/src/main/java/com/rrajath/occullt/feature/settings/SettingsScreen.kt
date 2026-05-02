@@ -20,7 +20,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -75,7 +74,8 @@ fun SettingsScreen(
     var mirrorDeletes by remember { mutableStateOf(false) }
     var darkTheme by remember { mutableStateOf(true) }
     var accentHue by remember { mutableStateOf(40) }
-    var connectionStatus by remember { mutableStateOf<String?>(null) }
+    var isConnected by remember { mutableStateOf(false) }
+    var isTesting by remember { mutableStateOf(false) }
 
     LaunchedEffect(settingsRepository) {
         launch {
@@ -287,41 +287,69 @@ fun SettingsScreen(
                             },
                             placeholder = "Enter API key"
                         )
-                        Box(
+                        Row(
                             modifier = Modifier.fillMaxWidth(),
-                            contentAlignment = Alignment.CenterEnd
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
+                            if (isConnected) {
+                                Row(
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(8.dp)
+                                            .clip(CircleShape)
+                                            .background(Color(0xFF22C55E))
+                                    )
+                                    Text(
+                                        text = "Connected",
+                                        style = androidx.compose.material3.MaterialTheme.typography.labelLarge.copy(
+                                            color = Color(0xFF22C55E),
+                                            fontSize = 12.sp
+                                        )
+                                    )
+                                }
+                            }
+
                             Box(
                                 modifier = Modifier
                                     .clip(RoundedCornerShape(999.dp))
                                     .background(colors.accentSoft)
-                                    .clickable {
+                                    .clickable(enabled = !isTesting) {
                                         if (immichUrl.isBlank() || immichApiKey.isBlank()) {
                                             Toast.makeText(context, "Please enter both Server URL and API Key", Toast.LENGTH_SHORT).show()
                                             return@clickable
                                         }
-                                        connectionStatus = "Testing..."
+                                        isTesting = true
                                         scope.launch {
                                             try {
                                                 val api = ImmichApi(immichUrl, immichApiKey)
                                                 val result = api.getServerAbout()
                                                 result.fold(
-                                                    onSuccess = { info ->
-                                                        connectionStatus = "Connected to Immich ${info.version}"
+                                                    onSuccess = {
+                                                        isConnected = true
                                                     },
                                                     onFailure = { error ->
-                                                        connectionStatus = "Connection failed: ${error.message}"
+                                                        isConnected = false
+                                                        val errorMsg = error.message ?: error.javaClass.simpleName
+                                                        Toast.makeText(context, "Connection failed: $errorMsg", Toast.LENGTH_LONG).show()
                                                     }
                                                 )
                                             } catch (e: Exception) {
-                                                connectionStatus = "Error: ${e.message}"
+                                                isConnected = false
+                                                val errorMsg = e.message ?: e.javaClass.simpleName
+                                                Toast.makeText(context, "Error: $errorMsg", Toast.LENGTH_LONG).show()
+                                            } finally {
+                                                isTesting = false
                                             }
                                         }
                                     }
                                     .padding(horizontal = 14.dp, vertical = 8.dp)
                             ) {
                                 Text(
-                                    text = "Test Connection",
+                                    text = if (isTesting) "Testing..." else "Test Connection",
                                     style = androidx.compose.material3.MaterialTheme.typography.labelLarge.copy(
                                         color = colors.accent,
                                         fontSize = 12.sp
@@ -331,37 +359,6 @@ fun SettingsScreen(
                         }
                     }
                 }
-            }
-
-            connectionStatus?.let { status ->
-                AlertDialog(
-                    onDismissRequest = { connectionStatus = null },
-                    title = {
-                        Text(
-                            text = if (status == "Testing...") "Testing Connection" else "Connection Result",
-                            style = androidx.compose.material3.MaterialTheme.typography.titleLarge.copy(
-                                color = colors.fg
-                            )
-                        )
-                    },
-                    text = {
-                        Text(
-                            text = status,
-                            style = androidx.compose.material3.MaterialTheme.typography.bodyMedium.copy(
-                                color = colors.fgDim
-                            )
-                        )
-                    },
-                    confirmButton = {
-                        androidx.compose.material3.TextButton(
-                            onClick = { connectionStatus = null }
-                        ) {
-                            Text("OK", color = colors.accent)
-                        }
-                    },
-                    containerColor = colors.bgElev,
-                    tonalElevation = 0.dp
-                )
             }
 
             Section(text = "Culling") {

@@ -1,10 +1,13 @@
 package com.rrajath.occullt.core.network
 
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import java.io.IOException
 import java.util.concurrent.TimeUnit
 
 class ImmichApi(
@@ -25,33 +28,35 @@ class ImmichApi(
         val licenseType: String?,
     )
 
-    suspend fun getServerAbout(): Result<ServerInfo> = runCatching {
-        val url = "$baseUrl/api/server/about"
+    suspend fun getServerAbout(): Result<ServerInfo> = withContext(Dispatchers.IO) {
+        try {
+            val url = "$baseUrl/api/server/about"
 
-        val request = Request.Builder()
-            .url(url)
-            .addHeader("x-api-key", apiKey)
-            .get()
-            .build()
+            val request = Request.Builder()
+                .url(url)
+                .addHeader("x-api-key", apiKey)
+                .get()
+                .build()
 
-        client.newCall(request).execute().use { response ->
+            val response = client.newCall(request).execute()
             val body = response.body?.string()
 
             if (!response.isSuccessful) {
-                throw Exception("HTTP ${response.code}: ${response.message}")
+                Result.failure(Exception("HTTP ${response.code}: ${response.message}"))
+            } else if (body.isNullOrEmpty()) {
+                Result.failure(Exception("Empty response body"))
+            } else {
+                runCatching {
+                    val json = Json.parseToJsonElement(body) as JsonObject
+                    val version = json["version"]?.jsonPrimitive?.content ?: "Unknown"
+                    val licenseType = json["licenseType"]?.jsonPrimitive?.content
+                    ServerInfo(version = version, licenseType = licenseType)
+                }
             }
-
-            if (body.isNullOrEmpty()) {
-                throw Exception("Empty response body")
-            }
-
-            val json = Json.parseToJsonElement(body) as? JsonObject
-                ?: throw Exception("Invalid JSON response")
-
-            val version = json["version"]?.jsonPrimitive?.content ?: "Unknown"
-            val licenseType = json["licenseType"]?.jsonPrimitive?.content
-
-            ServerInfo(version = version, licenseType = licenseType)
+        } catch (e: IOException) {
+            Result.failure(Exception("Network error: ${e.message ?: e.javaClass.simpleName}"))
+        } catch (e: Exception) {
+            Result.failure(Exception("Error: ${e.message ?: e.javaClass.simpleName}"))
         }
     }
 }
