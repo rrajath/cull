@@ -1,5 +1,6 @@
 package com.rrajath.occullt.feature.settings
 
+import android.util.Log
 import android.content.Intent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -295,25 +296,31 @@ fun SettingsScreen(
                                     .clip(RoundedCornerShape(999.dp))
                                     .background(colors.accentSoft)
                                     .clickable {
+                                        Log.d("SettingsScreen", "Test Connection clicked, url=$immichUrl")
                                         if (immichUrl.isBlank() || immichApiKey.isBlank()) {
                                             connectionStatus = "Please enter both Server URL and API Key"
                                             return@clickable
                                         }
                                         connectionStatus = "Testing..."
+                                        Log.d("SettingsScreen", "Status set to Testing...")
                                         scope.launch {
                                             try {
                                                 val api = ImmichApi(immichUrl, immichApiKey)
                                                 val result = api.getServerAbout()
+                                                Log.d("SettingsScreen", "Result: $result")
                                                 result.fold(
                                                     onSuccess = { info ->
                                                         connectionStatus = "Connected to Immich ${info.version}"
+                                                        Log.d("SettingsScreen", "Status set to Connected")
                                                     },
                                                     onFailure = { error ->
                                                         connectionStatus = "Connection failed: ${error.message}"
+                                                        Log.d("SettingsScreen", "Status set to Failed: ${error.message}")
                                                     }
                                                 )
                                             } catch (e: Exception) {
                                                 connectionStatus = "Error: ${e.message}"
+                                                Log.d("SettingsScreen", "Status set to Error: ${e.message}")
                                             }
                                         }
                                     }
