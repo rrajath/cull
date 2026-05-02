@@ -3,9 +3,11 @@ package com.rrajath.occullt.ui.icon
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Cloud
 import androidx.compose.material.icons.filled.CloudOff
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.PhotoLibrary
@@ -28,4 +30,6 @@ object CullIcons {
     val Library: ImageVector = Icons.Default.PhotoLibrary
     val ArrowDown: ImageVector = Icons.Default.ArrowDropDown
     val X: ImageVector = Icons.Default.Close
+    val Trash: ImageVector = Icons.Default.Delete
+    val Check: ImageVector = Icons.Default.Check
 }

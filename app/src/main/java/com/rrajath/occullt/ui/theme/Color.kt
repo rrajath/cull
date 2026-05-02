@@ -24,6 +24,7 @@ val LightScrim = Color(0x8C000000)
 
 val AccentTangerine = Color(0xFFE8854A)
 val AccentTangerineSoft = Color(0xFF3A2318)
+val LightAccentTangerineSoft = Color(0xFFF5E8DC)
 val Accent25 = Color(0xFFE86B4A)
 val Accent25Soft = Color(0xFF3A1C18)
 val Accent150 = Color(0xFF4AE8A0)
@@ -35,4 +36,5 @@ val Accent300Soft = Color(0xFF2A183A)
 
 val Danger = Color(0xFFD94F35)
 val DangerSoft = Color(0xFF4A1F18)
+val LightDangerSoft = Color(0xFFF5E0D8)
 val Pin = Color(0xFFF5A060)

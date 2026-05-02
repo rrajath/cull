@@ -54,9 +54,9 @@ private val LightExtendedColorScheme = ExtendedColorScheme(
     fgDim = LightFgDim,
     fgFaint = LightFgFaint,
     accent = AccentTangerine,
-    accentSoft = AccentTangerineSoft,
+    accentSoft = LightAccentTangerineSoft,
     danger = Danger,
-    dangerSoft = DangerSoft,
+    dangerSoft = LightDangerSoft,
     pin = Pin,
     scrim = LightScrim,
 )
@@ -79,7 +79,8 @@ val LocalExtendedColorScheme = staticCompositionLocalOf { DarkExtendedColorSchem
 
 @Composable
 fun OcculltTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
+    darkTheme: Boolean = true,
+    dynamicColor: Boolean = false,
     content: @Composable () -> Unit
 ) {
     val colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme

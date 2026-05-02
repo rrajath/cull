@@ -14,9 +14,12 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -25,6 +28,7 @@ import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.rrajath.occullt.core.datastore.SettingsRepository
 import com.rrajath.occullt.ui.component.CircleIcon
 import com.rrajath.occullt.ui.component.ContinuePill
 import com.rrajath.occullt.ui.component.GiantButton
@@ -32,17 +36,41 @@ import com.rrajath.occullt.ui.component.SourceMode
 import com.rrajath.occullt.ui.component.SourceSwitcher
 import com.rrajath.occullt.ui.icon.CullIcons
 import com.rrajath.occullt.ui.theme.LocalExtendedColorScheme
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.launch
 
 @Composable
 fun HomeScreen(
     onNavigateToLibrary: () -> Unit,
     onNavigateToSettings: () -> Unit,
     onContinueSession: (Int, String?) -> Unit,
+    settingsRepository: SettingsRepository,
     modifier: Modifier = Modifier,
 ) {
     val colors = LocalExtendedColorScheme.current
-    val sourceMode by remember { mutableStateOf(SourceMode.Hybrid) }
-    val hasSession = false
+    var sourceMode by remember { mutableStateOf(SourceMode.Hybrid) }
+    var hasSession by remember { mutableStateOf(false) }
+    var lastPhotoIndex by remember { mutableStateOf(0) }
+    var lastFolderUri by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(settingsRepository) {
+        launch {
+            settingsRepository.sourceMode.collectLatest { mode ->
+                sourceMode = mode
+            }
+        }
+        launch {
+            settingsRepository.lastPhotoIndex.collectLatest { index ->
+                lastPhotoIndex = index
+                hasSession = index > 0
+            }
+        }
+        launch {
+            settingsRepository.lastFolderUri.collectLatest { uri ->
+                lastFolderUri = uri
+        }
+    }
+}
 
     Box(
         modifier = modifier
@@ -110,7 +138,9 @@ fun HomeScreen(
 
             SourceSwitcher(
                 selected = sourceMode,
-                onSelectionChanged = {}
+                onSelectionChanged = { mode ->
+                    sourceMode = mode
+                }
             )
 
             Spacer(modifier = Modifier.weight(1f))
@@ -119,7 +149,7 @@ fun HomeScreen(
                 ContinuePill(
                     thumbnailContent = {},
                     label = "Continue where you left off",
-                    onClick = { onContinueSession(0, null) },
+                    onClick = { onContinueSession(lastPhotoIndex, lastFolderUri) },
                     modifier = Modifier.padding(bottom = 14.dp)
                 )
             }
