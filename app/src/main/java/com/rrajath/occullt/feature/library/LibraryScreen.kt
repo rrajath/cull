@@ -220,7 +220,11 @@ fun LibraryScreen(
                             contentDescription = photo.name,
                             contentScale = ContentScale.Crop,
                             modifier = Modifier.fillMaxSize(),
-                            colorFilter = if (isMarked) ColorFilter.tint(Color.Black.copy(alpha = 0.5f)) else null
+                            colorFilter = if (isMarked) ColorFilter.colorMatrix(
+                                androidx.compose.ui.graphics.ColorMatrix().apply {
+                                    setToSaturation(0f)
+                                }
+                            ) else null
                         )
 
                         if (isPinned) {
@@ -253,7 +257,7 @@ fun LibraryScreen(
                                 contentAlignment = Alignment.Center
                             ) {
                                 Icon(
-                                    imageVector = CullIcons.X,
+                                    imageVector = CullIcons.Trash,
                                     contentDescription = "Marked for deletion",
                                     tint = Color.White,
                                     modifier = Modifier.size(12.dp)

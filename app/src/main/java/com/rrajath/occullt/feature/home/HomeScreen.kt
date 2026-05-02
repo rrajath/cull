@@ -159,15 +159,7 @@ fun HomeScreen(
                 subtitle = "Browse your photos",
                 onClick = onNavigateToLibrary,
                 accentBackground = true,
-                minHeight = 160.dp,
-                icon = {
-                    androidx.compose.material3.Icon(
-                        imageVector = CullIcons.Arrow,
-                        contentDescription = null,
-                        tint = Color.White,
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
+                minHeight = 160.dp
             )
 
             Spacer(modifier = Modifier.height(12.dp))

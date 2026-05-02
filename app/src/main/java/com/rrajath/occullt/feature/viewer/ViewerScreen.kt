@@ -13,7 +13,6 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -172,7 +171,6 @@ fun ViewerScreen(
                 pinnedOffsetY = state.pinnedOffsetY,
                 isLoading = state.isLoading,
                 isMarked = state.isMarked,
-                swipeOffsetY = state.swipeOffsetY,
                 onToggleHud = { viewModel.toggleHud() },
                 onLongPress = {
                     if (state.pinnedIndex == page) {
@@ -202,18 +200,6 @@ fun ViewerScreen(
                     scope.launch {
                         settingsRepository.setMarkedIds(viewModel.state.value.markedIds)
                     }
-                },
-                onSwipeOffsetChanged = { offset ->
-                    viewModel.setSwipeOffsetY(offset)
-                },
-                onSwipeRelease = { offset ->
-                    if (kotlin.math.abs(offset) >= 60f) {
-                        viewModel.toggleMarked(photo.id)
-                        scope.launch {
-                            settingsRepository.setMarkedIds(viewModel.state.value.markedIds)
-                        }
-                    }
-                    viewModel.resetSwipeOffset()
                 }
             )
         }
@@ -227,9 +213,19 @@ fun ViewerScreen(
             HudPill(
                 markedCount = state.markedIds.size,
                 isPinned = state.pinnedIndex != null,
+                isMarked = state.isMarked,
                 onTogglePin = {
                     val currentIndex = pagerState.currentPage
                     viewModel.setPinnedIndex(if (state.pinnedIndex == currentIndex) null else currentIndex)
+                },
+                onToggleMark = {
+                    val currentPhoto = photos.getOrNull(pagerState.currentPage)
+                    if (currentPhoto != null) {
+                        viewModel.toggleMarked(currentPhoto.id)
+                        scope.launch {
+                            settingsRepository.setMarkedIds(viewModel.state.value.markedIds)
+                        }
+                    }
                 },
                 onConfirm = {
                     viewModel.showDeleteDialog()
@@ -258,21 +254,6 @@ fun ViewerScreen(
                     )
                 )
             }
-        }
-
-        if (state.isMarked) {
-            MarkedBanner(
-                onUndo = {
-                    val currentPhoto = photos.getOrNull(pagerState.currentPage)
-                    if (currentPhoto != null) {
-                        viewModel.undoMark(currentPhoto.id)
-                        scope.launch {
-                            settingsRepository.setMarkedIds(viewModel.state.value.markedIds)
-                        }
-                    }
-                },
-                modifier = Modifier.align(Alignment.TopEnd)
-            )
         }
 
         if (state.showDeleteDialog) {
@@ -366,7 +347,6 @@ private fun ViewerPhotoPage(
     pinnedOffsetY: Float,
     isLoading: Boolean,
     isMarked: Boolean,
-    swipeOffsetY: Float,
     onToggleHud: () -> Unit,
     onLongPress: () -> Unit,
     onRelease: () -> Unit,
@@ -375,12 +355,8 @@ private fun ViewerPhotoPage(
     onResetZoom: () -> Unit,
     onLoadingChanged: (Boolean) -> Unit,
     onMarkToggle: () -> Unit,
-    onSwipeOffsetChanged: (Float) -> Unit,
-    onSwipeRelease: (Float) -> Unit,
 ) {
     val colors = LocalExtendedColorScheme.current
-    var isDragging by remember { mutableStateOf(false) }
-    var dragStartY by remember { mutableStateOf(0f) }
 
     val displayPhoto = if (isShowingPinned && pinnedPhoto != null) pinnedPhoto else photo
     val currentScale = if (isShowingPinned) pinnedScale else scale
@@ -391,17 +367,10 @@ private fun ViewerPhotoPage(
         targetValue = if (isMarked) 0.85f else 1f,
         label = "brightness"
     )
-    val translateY by animateFloatAsState(
-        targetValue = if (isMarked) 18f else swipeOffsetY,
-        label = "translateY"
-    )
 
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .graphicsLayer(
-                translationY = translateY
-            )
             .combinedClickable(
                 onClick = onToggleHud,
                 onLongClick = {
@@ -426,35 +395,6 @@ private fun ViewerPhotoPage(
                             val newX = currentOffsetX + pan.x
                             val newY = currentOffsetY + pan.y
                             onZoomChanged(currentScale, newX, newY)
-                        }
-                    }
-                )
-            }
-            .pointerInput(Unit) {
-                detectDragGestures(
-                    onDragStart = { offset ->
-                        if (currentScale <= 1f) {
-                            isDragging = true
-                            dragStartY = offset.y
-                        }
-                    },
-                    onDragCancel = {
-                        if (isDragging) {
-                            onSwipeRelease(swipeOffsetY)
-                            isDragging = false
-                        }
-                    },
-                    onDragEnd = {
-                        if (isDragging) {
-                            onSwipeRelease(swipeOffsetY)
-                            isDragging = false
-                        }
-                    },
-                    onDrag = { change, dragAmount ->
-                        if (isDragging && currentScale <= 1f) {
-                            val newY = swipeOffsetY + dragAmount.y
-                            onSwipeOffsetChanged(newY)
-                            change.consume()
                         }
                     }
                 )
@@ -614,7 +554,9 @@ private fun ViewerPhotoPage(
 private fun HudPill(
     markedCount: Int,
     isPinned: Boolean,
+    isMarked: Boolean,
     onTogglePin: () -> Unit,
+    onToggleMark: () -> Unit,
     onConfirm: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -703,6 +645,24 @@ private fun HudPill(
 
                 Box(
                     modifier = Modifier
+                        .size(40.dp)
+                        .clip(CircleShape)
+                        .background(
+                            if (isMarked) colors.danger else colors.bgElev.copy(alpha = 0.85f)
+                        )
+                        .combinedClickable(onClick = onToggleMark),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = CullIcons.Trash,
+                        contentDescription = if (isMarked) "Unmark" else "Mark for deletion",
+                        tint = if (isMarked) Color.White else colors.fgDim,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+
+                Box(
+                    modifier = Modifier
                         .clip(RoundedCornerShape(999.dp))
                         .background(colors.accent)
                         .combinedClickable(onClick = onConfirm)
@@ -716,56 +676,6 @@ private fun HudPill(
                         )
                     )
                 }
-            }
-        }
-    }
-}
-
-@Composable
-private fun MarkedBanner(
-    onUndo: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val colors = LocalExtendedColorScheme.current
-
-    Box(
-        modifier = modifier
-            .padding(top = 100.dp, end = 16.dp)
-            .clip(RoundedCornerShape(999.dp))
-            .background(colors.danger.copy(alpha = 0.9f))
-            .padding(horizontal = 14.dp, vertical = 8.dp)
-    ) {
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Icon(
-                imageVector = CullIcons.Trash,
-                contentDescription = null,
-                tint = Color.White,
-                modifier = Modifier.size(16.dp)
-            )
-            Text(
-                text = "Marked",
-                style = androidx.compose.material3.MaterialTheme.typography.labelLarge.copy(
-                    color = Color.White,
-                    fontSize = 12.sp
-                )
-            )
-            Box(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(999.dp))
-                    .background(Color.White.copy(alpha = 0.25f))
-                    .combinedClickable(onClick = onUndo)
-                    .padding(horizontal = 10.dp, vertical = 4.dp)
-            ) {
-                Text(
-                    text = "Undo",
-                    style = androidx.compose.material3.MaterialTheme.typography.labelLarge.copy(
-                        color = Color.White,
-                        fontSize = 11.sp
-                    )
-                )
             }
         }
     }
