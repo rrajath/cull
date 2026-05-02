@@ -1,6 +1,5 @@
 package com.rrajath.occullt.core.network
 
-import android.util.Log
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -28,7 +27,6 @@ class ImmichApi(
 
     suspend fun getServerAbout(): Result<ServerInfo> = runCatching {
         val url = "$baseUrl/api/server/about"
-        Log.d("ImmichApi", "Requesting: $url")
 
         val request = Request.Builder()
             .url(url)
@@ -36,13 +34,8 @@ class ImmichApi(
             .get()
             .build()
 
-        Log.d("ImmichApi", "Request headers: ${request.headers}")
-
         client.newCall(request).execute().use { response ->
-            Log.d("ImmichApi", "Response code: ${response.code}")
-
             val body = response.body?.string()
-            Log.d("ImmichApi", "Response body: $body")
 
             if (!response.isSuccessful) {
                 throw Exception("HTTP ${response.code}: ${response.message}")
