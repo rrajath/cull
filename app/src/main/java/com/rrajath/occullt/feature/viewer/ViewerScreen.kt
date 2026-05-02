@@ -13,7 +13,6 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -50,10 +49,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.ColorFilter
-import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
@@ -105,14 +101,14 @@ fun ViewerScreen(
     }
 
     LaunchedEffect(settingsRepository) {
-        settingsRepository.longPressThreshold.collectLatest { threshold ->
-            viewModel.setLongPressThreshold(threshold)
+        settingsRepository.markedIds.collectLatest { ids ->
+            viewModel.setMarkedIds(ids)
         }
     }
 
     LaunchedEffect(settingsRepository) {
-        settingsRepository.markedIds.collectLatest { ids ->
-            viewModel.setMarkedIds(ids)
+        settingsRepository.pinnedId.collectLatest { id ->
+            viewModel.setPinnedId(id)
         }
     }
 
@@ -151,29 +147,27 @@ fun ViewerScreen(
     ) {
         HorizontalPager(
             state = pagerState,
-            modifier = Modifier.fillMaxSize(),
-            userScrollEnabled = state.scale <= 1f
+            modifier = Modifier.fillMaxSize()
         ) { page ->
             val photo = photos[page]
+            val isPinned = state.pinnedId == photo.id
+            val pinnedPhoto = state.pinnedId?.let { pinnedId ->
+                photos.find { it.id == pinnedId }
+            }
+
             ViewerPhotoPage(
                 photo = photo,
                 index = page,
                 totalCount = photos.size,
-                isPinned = state.pinnedIndex == page,
-                isLongPressing = state.isLongPressing && state.pinnedIndex != null,
-                isShowingPinned = state.isLongPressing && state.pinnedIndex != null,
-                pinnedPhoto = state.pinnedIndex?.let { photos.getOrNull(it) },
-                scale = state.scale,
-                offsetX = state.offsetX,
-                offsetY = state.offsetY,
-                pinnedScale = state.pinnedScale,
-                pinnedOffsetX = state.pinnedOffsetX,
-                pinnedOffsetY = state.pinnedOffsetY,
+                isPinned = isPinned,
+                isLongPressing = state.isLongPressing && state.pinnedId != null && state.pinnedId != photo.id,
+                isShowingPinned = state.isLongPressing && state.pinnedId != null && state.pinnedId != photo.id,
+                pinnedPhoto = pinnedPhoto,
                 isLoading = state.isLoading,
                 isMarked = state.isMarked,
                 onToggleHud = { viewModel.toggleHud() },
                 onLongPress = {
-                    if (state.pinnedIndex == page) {
+                    if (state.pinnedId == photo.id) {
                         Toast.makeText(
                             context,
                             "Cannot compare a pinned image against itself",
@@ -186,14 +180,13 @@ fun ViewerScreen(
                 onRelease = {
                     viewModel.setLongPressing(false)
                 },
-                onSetPinned = {
-                    val currentIndex = pagerState.currentPage
-                    viewModel.setPinnedIndex(if (state.pinnedIndex == currentIndex) null else currentIndex)
+                onTogglePin = {
+                    val newPinnedId = if (state.pinnedId == photo.id) null else photo.id
+                    viewModel.setPinnedId(newPinnedId)
+                    scope.launch {
+                        settingsRepository.setPinnedId(newPinnedId)
+                    }
                 },
-                onZoomChanged = { s, ox, oy ->
-                    viewModel.setZoom(s, ox, oy)
-                },
-                onResetZoom = { viewModel.resetZoom() },
                 onLoadingChanged = { viewModel.setLoading(it) },
                 onMarkToggle = {
                     viewModel.toggleMarked(photo.id)
@@ -212,11 +205,17 @@ fun ViewerScreen(
         ) {
             HudPill(
                 markedCount = state.markedIds.size,
-                isPinned = state.pinnedIndex != null,
+                isPinned = state.pinnedId != null,
                 isMarked = state.isMarked,
                 onTogglePin = {
-                    val currentIndex = pagerState.currentPage
-                    viewModel.setPinnedIndex(if (state.pinnedIndex == currentIndex) null else currentIndex)
+                    val currentPhoto = photos.getOrNull(pagerState.currentPage)
+                    if (currentPhoto != null) {
+                        val newPinnedId = if (state.pinnedId == currentPhoto.id) null else currentPhoto.id
+                        viewModel.setPinnedId(newPinnedId)
+                        scope.launch {
+                            settingsRepository.setPinnedId(newPinnedId)
+                        }
+                    }
                 },
                 onToggleMark = {
                     val currentPhoto = photos.getOrNull(pagerState.currentPage)
@@ -339,29 +338,18 @@ private fun ViewerPhotoPage(
     isLongPressing: Boolean,
     isShowingPinned: Boolean,
     pinnedPhoto: PhotoItem?,
-    scale: Float,
-    offsetX: Float,
-    offsetY: Float,
-    pinnedScale: Float,
-    pinnedOffsetX: Float,
-    pinnedOffsetY: Float,
     isLoading: Boolean,
     isMarked: Boolean,
     onToggleHud: () -> Unit,
     onLongPress: () -> Unit,
     onRelease: () -> Unit,
-    onSetPinned: () -> Unit,
-    onZoomChanged: (Float, Float, Float) -> Unit,
-    onResetZoom: () -> Unit,
+    onTogglePin: () -> Unit,
     onLoadingChanged: (Boolean) -> Unit,
     onMarkToggle: () -> Unit,
 ) {
     val colors = LocalExtendedColorScheme.current
 
     val displayPhoto = if (isShowingPinned && pinnedPhoto != null) pinnedPhoto else photo
-    val currentScale = if (isShowingPinned) pinnedScale else scale
-    val currentOffsetX = if (isShowingPinned) pinnedOffsetX else offsetX
-    val currentOffsetY = if (isShowingPinned) pinnedOffsetY else offsetY
 
     val brightness by animateFloatAsState(
         targetValue = if (isMarked) 0.85f else 1f,
@@ -371,84 +359,37 @@ private fun ViewerPhotoPage(
     Box(
         modifier = Modifier
             .fillMaxSize()
+            .graphicsLayer(alpha = brightness)
             .combinedClickable(
                 onClick = onToggleHud,
-                onLongClick = {
-                    if (!isPinned) {
-                        onLongPress()
-                    }
-                }
+                onLongClick = onLongPress
             )
-            .pointerInput(Unit) {
-                detectTransformGestures(
-                    onGesture = { _, pan, zoom, _ ->
-                        if (zoom != 1f) {
-                            val newScale = (currentScale * zoom).coerceIn(1f, 5f)
-                            if (newScale > 1f) {
-                                val newX = currentOffsetX + pan.x
-                                val newY = currentOffsetY + pan.y
-                                onZoomChanged(newScale, newX, newY)
-                            } else {
-                                onZoomChanged(1f, 0f, 0f)
-                            }
-                        } else if (currentScale > 1f && (pan.x != 0f || pan.y != 0f)) {
-                            val newX = currentOffsetX + pan.x
-                            val newY = currentOffsetY + pan.y
-                            onZoomChanged(currentScale, newX, newY)
-                        }
-                    }
-                )
-            }
     ) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .graphicsLayer(
-                    scaleX = currentScale,
-                    scaleY = currentScale,
-                    translationX = currentOffsetX,
-                    translationY = currentOffsetY,
-                    colorFilter = if (isMarked && !isShowingPinned) {
-                        ColorFilter.colorMatrix(
-                            ColorMatrix(
-                                floatArrayOf(
-                                    0.2126f, 0.7152f, 0.0722f, 0f, 0f,
-                                    0.2126f, 0.7152f, 0.0722f, 0f, 0f,
-                                    0.2126f, 0.7152f, 0.0722f, 0f, 0f,
-                                    0f, 0f, 0f, 1f, 0f
-                                )
-                            )
-                        )
-                    } else null,
-                    alpha = if (isMarked && !isShowingPinned) brightness else 1f
+        AsyncImage(
+            model = ImageRequest.Builder(LocalContext.current)
+                .data(displayPhoto.uri)
+                .crossfade(false)
+                .listener(
+                    onSuccess = { _, _ -> onLoadingChanged(false) },
+                    onError = { _, _ -> onLoadingChanged(false) }
                 )
-        ) {
-            AsyncImage(
-                model = ImageRequest.Builder(LocalContext.current)
-                    .data(displayPhoto.uri)
-                    .crossfade(false)
-                    .listener(
-                        onSuccess = { _, _ -> onLoadingChanged(false) },
-                        onError = { _, _ -> onLoadingChanged(false) }
-                    )
-                    .build(),
-                contentDescription = displayPhoto.name,
-                contentScale = ContentScale.Fit,
-                modifier = Modifier.fillMaxSize()
-            )
+                .build(),
+            contentDescription = displayPhoto.name,
+            contentScale = ContentScale.Fit,
+            modifier = Modifier.fillMaxSize()
+        )
 
-            if (isLoading) {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    CircularProgressIndicator(
-                        color = colors.accent,
-                        modifier = Modifier.size(46.dp),
-                        strokeWidth = 3.dp,
-                        trackColor = Color.White.copy(alpha = 0.2f)
-                    )
-                }
+        if (isLoading) {
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center
+            ) {
+                CircularProgressIndicator(
+                    color = colors.accent,
+                    modifier = Modifier.size(46.dp),
+                    strokeWidth = 3.dp,
+                    trackColor = Color.White.copy(alpha = 0.2f)
+                )
             }
         }
 
@@ -505,27 +446,6 @@ private fun ViewerPhotoPage(
                         style = androidx.compose.material3.MaterialTheme.typography.labelLarge.copy(
                             color = Color.White,
                             fontSize = 11.sp
-                        )
-                    )
-                }
-            }
-
-            if (scale > 1f) {
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .clip(RoundedCornerShape(999.dp))
-                        .background(Color.Black.copy(alpha = 0.6f))
-                        .combinedClickable(
-                            onClick = onResetZoom
-                        )
-                        .padding(horizontal = 12.dp, vertical = 8.dp)
-                ) {
-                    Text(
-                        text = "Reset Both Zooms",
-                        style = androidx.compose.material3.MaterialTheme.typography.labelLarge.copy(
-                            color = Color.White.copy(alpha = 0.9f),
-                            fontSize = 12.sp
                         )
                     )
                 }
