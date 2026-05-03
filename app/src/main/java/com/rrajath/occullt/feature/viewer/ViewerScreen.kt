@@ -106,7 +106,7 @@ fun ViewerScreen(
 
     LaunchedEffect(folderUri) {
         if (folderUri != null) {
-            val cached = PhotoCache.getPhotos(folderUri)
+            val cached = PhotoCache.getPhotos()
             if (cached != null) {
                 photos = cached
                 isLoadingPhotos = false

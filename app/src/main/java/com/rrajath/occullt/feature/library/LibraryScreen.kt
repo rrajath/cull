@@ -218,7 +218,7 @@ fun LibraryScreen(
                             .aspectRatio(0.75f)
                             .clip(RoundedCornerShape(14.dp))
                             .clickable {
-                                PhotoCache.setPhotos(state.photos, state.folderUri)
+                                PhotoCache.setPhotos(state.photos)
                                 val uri = when (photo.source) {
                                     PhotoSource.Local -> "mediastore"
                                     PhotoSource.Immich -> "immich"
