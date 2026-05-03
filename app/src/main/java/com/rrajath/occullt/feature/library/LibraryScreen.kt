@@ -44,6 +44,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
 import coil3.request.crossfade
+import com.rrajath.occullt.core.datastore.PhotoCache
 import com.rrajath.occullt.core.datastore.SettingsRepository
 import com.rrajath.occullt.core.model.PhotoSource
 import com.rrajath.occullt.ui.component.CircleIcon
@@ -217,6 +218,7 @@ fun LibraryScreen(
                             .aspectRatio(0.75f)
                             .clip(RoundedCornerShape(14.dp))
                             .clickable {
+                                PhotoCache.setPhotos(state.photos, state.folderUri)
                                 val uri = when (photo.source) {
                                     PhotoSource.Local -> "mediastore"
                                     PhotoSource.Immich -> "immich"

@@ -21,8 +21,21 @@ class UnifiedPhotoRepository(
         folderUri: String? = null,
     ): Result<List<UnifiedPhotoItem>> = withContext(Dispatchers.IO) {
         try {
+            if (sourceMode == SourceMode.Local) {
+                val localPhotos = when {
+                    folderUri == "mediastore" -> {
+                        localRepo.loadCameraPhotosFromMediaStore(context).map { it.toUnified(PhotoSource.Local) }
+                    }
+                    folderUri != null -> {
+                        val uri = Uri.parse(folderUri)
+                        localRepo.getPhotosFromFolder(uri).map { it.toUnified(PhotoSource.Local) }
+                    }
+                    else -> emptyList()
+                }
+                return@withContext Result.success(localPhotos)
+            }
+
             val localPhotos = when {
-                sourceMode == SourceMode.Immich -> emptyList()
                 folderUri == "mediastore" -> {
                     localRepo.loadCameraPhotosFromMediaStore(context).map { it.toUnified(PhotoSource.Local) }
                 }
@@ -34,7 +47,6 @@ class UnifiedPhotoRepository(
             }
 
             val immichPhotos = when {
-                sourceMode == SourceMode.Local -> emptyList()
                 immichRepository == null -> emptyList()
                 else -> {
                     val result = immichRepository.getAllPhotos()
@@ -43,9 +55,9 @@ class UnifiedPhotoRepository(
             }
 
             val merged = when (sourceMode) {
-                SourceMode.Local -> localPhotos
                 SourceMode.Immich -> immichPhotos
                 SourceMode.Hybrid -> mergePhotoLists(localPhotos, immichPhotos)
+                SourceMode.Local -> localPhotos
             }
 
             Result.success(merged)

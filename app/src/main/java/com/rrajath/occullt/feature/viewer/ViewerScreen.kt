@@ -71,6 +71,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
 import coil3.request.crossfade
+import com.rrajath.occullt.core.datastore.PhotoCache
 import com.rrajath.occullt.core.datastore.SettingsRepository
 import com.rrajath.occullt.core.datastore.UnifiedPhotoRepository
 import com.rrajath.occullt.core.model.PhotoSource
@@ -105,24 +106,34 @@ fun ViewerScreen(
 
     LaunchedEffect(folderUri) {
         if (folderUri != null) {
-            isLoadingPhotos = true
-            val sourceMode = settingsRepository.sourceMode.first()
-            val immichUrl = settingsRepository.immichUrl.first()
-            val immichApiKey = settingsRepository.immichApiKey.first()
-
-            val immichRepo = if (sourceMode != SourceMode.Local && !immichUrl.isNullOrBlank() && !immichApiKey.isNullOrBlank()) {
-                ImmichRepository(ImmichApi(immichUrl, immichApiKey))
+            val cached = PhotoCache.getPhotos(folderUri)
+            if (cached != null) {
+                photos = cached
+                isLoadingPhotos = false
             } else {
-                null
-            }
+                isLoadingPhotos = true
+                val sourceMode = settingsRepository.sourceMode.first()
 
-            val unifiedRepo = UnifiedPhotoRepository(context, immichRepo)
-            val result = unifiedRepo.loadPhotos(sourceMode, folderUri)
+                val immichRepo = if (sourceMode == SourceMode.Local) {
+                    null
+                } else {
+                    val immichUrl = settingsRepository.immichUrl.first()
+                    val immichApiKey = settingsRepository.immichApiKey.first()
+                    if (!immichUrl.isNullOrBlank() && !immichApiKey.isNullOrBlank()) {
+                        ImmichRepository(ImmichApi(immichUrl, immichApiKey))
+                    } else {
+                        null
+                    }
+                }
 
-            if (result.isSuccess) {
-                photos = result.getOrNull().orEmpty()
+                val unifiedRepo = UnifiedPhotoRepository(context, immichRepo)
+                val result = unifiedRepo.loadPhotos(sourceMode, folderUri)
+
+                if (result.isSuccess) {
+                    photos = result.getOrNull().orEmpty()
+                }
+                isLoadingPhotos = false
             }
-            isLoadingPhotos = false
         }
     }
 
@@ -167,23 +178,28 @@ fun ViewerScreen(
         val currentPhoto = photos.getOrNull(pagerState.currentPage)
         if (currentPhoto != null) {
             viewModel.setIsMarked(state.markedIds.contains(currentPhoto.id))
-            if (currentPhoto.source == PhotoSource.Local) {
-                val sourceMode = settingsRepository.sourceMode.first()
-                val immichUrl = settingsRepository.immichUrl.first()
-                val immichApiKey = settingsRepository.immichApiKey.first()
-                if (sourceMode != SourceMode.Local && !immichUrl.isNullOrBlank() && !immichApiKey.isNullOrBlank()) {
-                    launch {
-                        val immichApi = ImmichApi(immichUrl, immichApiKey)
-                        val result = immichApi.checkAssetExists(currentPhoto.name, currentPhoto.dateModified)
-                        if (result.isSuccess) {
+            val sourceMode = settingsRepository.sourceMode.first()
+
+            when {
+                sourceMode == SourceMode.Local -> {
+                    viewModel.setIsOnImmich(false)
+                }
+                currentPhoto.source == PhotoSource.Immich -> {
+                    viewModel.setIsOnImmich(true)
+                }
+                else -> {
+                    val immichUrl = settingsRepository.immichUrl.first()
+                    val immichApiKey = settingsRepository.immichApiKey.first()
+                    if (!immichUrl.isNullOrBlank() && !immichApiKey.isNullOrBlank()) {
+                        launch {
+                            val immichApi = ImmichApi(immichUrl, immichApiKey)
+                            val result = immichApi.checkAssetExists(currentPhoto.name, currentPhoto.dateModified)
                             viewModel.setIsOnImmich(result.getOrNull() == true)
-                        } else {
-                            viewModel.setIsOnImmich(false)
                         }
+                    } else {
+                        viewModel.setIsOnImmich(false)
                     }
                 }
-            } else {
-                viewModel.setIsOnImmich(true)
             }
         }
     }
