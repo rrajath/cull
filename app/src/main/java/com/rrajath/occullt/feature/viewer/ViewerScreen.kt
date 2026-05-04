@@ -70,9 +70,10 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
-import coil3.request.crossfade
+import com.rrajath.occullt.OcculltApplication
 import com.rrajath.occullt.core.datastore.PhotoCache
 import com.rrajath.occullt.core.datastore.SettingsRepository
+import com.rrajath.occullt.core.database.ImmichAssetMappingDb
 import com.rrajath.occullt.core.datastore.UnifiedPhotoRepository
 import com.rrajath.occullt.core.model.PhotoSource
 import com.rrajath.occullt.core.model.UnifiedPhotoItem
@@ -120,8 +121,11 @@ fun ViewerScreen(
                     val immichUrl = settingsRepository.immichUrl.first()
                     val immichApiKey = settingsRepository.immichApiKey.first()
                     if (!immichUrl.isNullOrBlank() && !immichApiKey.isNullOrBlank()) {
-                        ImmichRepository(ImmichApi(immichUrl, immichApiKey))
+                        OcculltApplication.setImmichApiKey(immichApiKey)
+                        val mappingDb = ImmichAssetMappingDb.getInstance(context)
+                        ImmichRepository(ImmichApi(immichUrl, immichApiKey), mappingDb)
                     } else {
+                        OcculltApplication.setImmichApiKey(null)
                         null
                     }
                 }
@@ -182,7 +186,23 @@ fun ViewerScreen(
 
             when {
                 sourceMode == SourceMode.Local -> {
-                    viewModel.setIsOnImmich(false)
+                    val immichUrl = settingsRepository.immichUrl.first()
+                    val immichApiKey = settingsRepository.immichApiKey.first()
+                    if (!immichUrl.isNullOrBlank() && !immichApiKey.isNullOrBlank()) {
+                        launch {
+                            val mappingDb = ImmichAssetMappingDb.getInstance(context)
+                            val mapping = mappingDb.getByFileName(currentPhoto.name)
+                            if (mapping != null) {
+                                val immichApi = ImmichApi(immichUrl, immichApiKey)
+                                val result = immichApi.getAsset(mapping.id)
+                                viewModel.setIsOnImmich(result.isSuccess)
+                            } else {
+                                viewModel.setIsOnImmich(false)
+                            }
+                        }
+                    } else {
+                        viewModel.setIsOnImmich(false)
+                    }
                 }
                 currentPhoto.source == PhotoSource.Immich -> {
                     viewModel.setIsOnImmich(true)
@@ -192,9 +212,15 @@ fun ViewerScreen(
                     val immichApiKey = settingsRepository.immichApiKey.first()
                     if (!immichUrl.isNullOrBlank() && !immichApiKey.isNullOrBlank()) {
                         launch {
-                            val immichApi = ImmichApi(immichUrl, immichApiKey)
-                            val result = immichApi.checkAssetExists(currentPhoto.name, currentPhoto.dateModified)
-                            viewModel.setIsOnImmich(result.getOrNull() == true)
+                            val mappingDb = ImmichAssetMappingDb.getInstance(context)
+                            val mapping = mappingDb.getByFileName(currentPhoto.name)
+                            if (mapping != null) {
+                                val immichApi = ImmichApi(immichUrl, immichApiKey)
+                                val result = immichApi.getAsset(mapping.id)
+                                viewModel.setIsOnImmich(result.isSuccess)
+                            } else {
+                                viewModel.setIsOnImmich(false)
+                            }
                         }
                     } else {
                         viewModel.setIsOnImmich(false)
@@ -365,7 +391,8 @@ fun ViewerScreen(
                             val immichApiKey = settingsRepository.immichApiKey.first()
                             
                             val immichRepo = if (!immichUrl.isNullOrBlank() && !immichApiKey.isNullOrBlank()) {
-                                ImmichRepository(ImmichApi(immichUrl, immichApiKey))
+                                val mappingDb = ImmichAssetMappingDb.getInstance(context)
+                                ImmichRepository(ImmichApi(immichUrl, immichApiKey), mappingDb)
                             } else {
                                 null
                             }
@@ -546,7 +573,6 @@ private fun ViewerPhotoPage(
             AsyncImage(
                 model = ImageRequest.Builder(LocalContext.current)
                     .data(imageUrl)
-                    .crossfade(false)
                     .listener(
                         onSuccess = { _, _ -> onLoadingChanged(false) },
                         onError = { _, _ -> onLoadingChanged(false) }

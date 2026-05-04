@@ -5,8 +5,10 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.put
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody
@@ -204,6 +206,36 @@ class ImmichApi(
         return "$baseUrl/api/assets/$assetId/original"
     }
 
+    suspend fun getAsset(assetId: String): Result<ImmichAsset> = withContext(Dispatchers.IO) {
+        try {
+            val url = "$baseUrl/api/assets/$assetId"
+
+            val request = Request.Builder()
+                .url(url)
+                .addHeader("x-api-key", apiKey)
+                .get()
+                .build()
+
+            val response = client.newCall(request).execute()
+            val body = response.body?.string()
+
+            if (!response.isSuccessful) {
+                Result.failure(Exception("HTTP ${response.code}: ${response.message}"))
+            } else if (body.isNullOrEmpty()) {
+                Result.failure(Exception("Empty response body"))
+            } else {
+                runCatching {
+                    val assetJson = Json.parseToJsonElement(body) as JsonObject
+                    parseImmichAsset(assetJson)
+                }
+            }
+        } catch (e: IOException) {
+            Result.failure(Exception("Network error: ${e.message ?: e.javaClass.simpleName}"))
+        } catch (e: Exception) {
+            Result.failure(Exception("Error: ${e.message ?: e.javaClass.simpleName}"))
+        }
+    }
+
     suspend fun deleteAsset(assetId: String): Result<Unit> = withContext(Dispatchers.IO) {
         try {
             val url = "$baseUrl/api/assets"
@@ -287,5 +319,106 @@ class ImmichApi(
         } catch (e: Exception) {
             Result.failure(Exception("Error: ${e.message ?: e.javaClass.simpleName}"))
         }
+    }
+
+    data class SearchResponse(
+        val assets: List<ImmichAsset>,
+        val total: Int,
+        val hasNextPage: Boolean,
+    )
+
+    suspend fun searchMetadata(
+        createdAfter: String,
+        createdBefore: String? = null,
+        page: Int = 1,
+        size: Int = 200,
+    ): Result<SearchResponse> = withContext(Dispatchers.IO) {
+        try {
+            val url = "$baseUrl/api/search/metadata"
+
+            val bodyJson = buildJsonObject {
+                put("type", "IMAGE")
+                put("createdAfter", createdAfter)
+                createdBefore?.let { put("createdBefore", it) }
+                put("page", page)
+                put("size", size)
+            }
+            val jsonBody = bodyJson.toString()
+
+            val request = Request.Builder()
+                .url(url)
+                .addHeader("x-api-key", apiKey)
+                .addHeader("Content-Type", "application/json")
+                .post(RequestBody.create("application/json".toMediaType(), jsonBody))
+                .build()
+
+            val response = client.newCall(request).execute()
+            val body = response.body?.string()
+
+            if (!response.isSuccessful) {
+                Result.failure(Exception("HTTP ${response.code}: ${response.message}"))
+            } else if (body.isNullOrEmpty()) {
+                Result.success(SearchResponse(emptyList(), 0, false))
+            } else {
+                runCatching {
+                    val jsonElement = Json.parseToJsonElement(body) as JsonObject
+                    val assetsGroup = jsonElement["assets"] as? JsonObject
+                    val assetsArray = assetsGroup?.get("items") as? JsonArray ?: JsonArray(emptyList())
+                    val total = assetsGroup?.get("total")?.jsonPrimitive?.content?.toIntOrNull() ?: 0
+                    val hasNextPage = assetsGroup?.get("hasNextPage")?.jsonPrimitive?.content?.toBoolean() ?: false
+
+                    val assets = assetsArray.mapNotNull { assetJson ->
+                        val asset = assetJson as? JsonObject ?: return@mapNotNull null
+                        parseImmichAsset(asset)
+                    }
+
+                    SearchResponse(
+                        assets = assets,
+                        total = total,
+                        hasNextPage = hasNextPage,
+                    )
+                }
+            }
+        } catch (e: IOException) {
+            Result.failure(Exception("Network error: ${e.message ?: e.javaClass.simpleName}"))
+        } catch (e: Exception) {
+            Result.failure(Exception("Error: ${e.message ?: e.javaClass.simpleName}"))
+        }
+    }
+
+    private fun parseImmichAsset(asset: JsonObject): ImmichAsset {
+        val id = asset["id"]?.jsonPrimitive?.content ?: ""
+        val deviceAssetId = asset["deviceAssetId"]?.jsonPrimitive?.content ?: ""
+        val fileName = asset["originalFileName"]?.jsonPrimitive?.content
+            ?: asset["fileName"]?.jsonPrimitive?.content ?: ""
+        val fileCreatedAt = asset["fileCreatedAt"]?.jsonPrimitive?.content ?: ""
+        val fileModifiedAt = asset["fileModifiedAt"]?.jsonPrimitive?.content ?: ""
+        val isFavorite = asset["isFavorite"]?.jsonPrimitive?.content?.toBoolean() ?: false
+        val isTrashed = asset["isTrashed"]?.jsonPrimitive?.content?.toBoolean() ?: false
+        val type = asset["type"]?.jsonPrimitive?.content ?: "IMAGE"
+        val thumbhash = asset["thumbhash"]?.jsonPrimitive?.content
+
+        val exifInfo = asset["exifInfo"]?.let { exifJson ->
+            val exifObj = exifJson as? JsonObject ?: return@let null
+            ExifInfo(
+                dateTimeOriginal = exifObj["dateTimeOriginal"]?.jsonPrimitive?.content,
+                fileSizeInByte = exifObj["fileSizeInByte"]?.jsonPrimitive?.content?.toLongOrNull(),
+                exifImageWidth = exifObj["exifImageWidth"]?.jsonPrimitive?.content?.toIntOrNull(),
+                exifImageHeight = exifObj["exifImageHeight"]?.jsonPrimitive?.content?.toIntOrNull(),
+            )
+        }
+
+        return ImmichAsset(
+            id = id,
+            deviceAssetId = deviceAssetId,
+            fileName = fileName,
+            fileCreatedAt = fileCreatedAt,
+            fileModifiedAt = fileModifiedAt,
+            isFavorite = isFavorite,
+            isTrashed = isTrashed,
+            type = type,
+            thumbhash = thumbhash,
+            exifInfo = exifInfo,
+        )
     }
 }

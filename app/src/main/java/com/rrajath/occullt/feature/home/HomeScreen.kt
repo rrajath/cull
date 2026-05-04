@@ -19,6 +19,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -48,6 +49,7 @@ fun HomeScreen(
     modifier: Modifier = Modifier,
 ) {
     val colors = LocalExtendedColorScheme.current
+    val scope = rememberCoroutineScope()
     var sourceMode by remember { mutableStateOf(SourceMode.Hybrid) }
     var hasSession by remember { mutableStateOf(false) }
     var lastPhotoIndex by remember { mutableStateOf(0) }
@@ -140,6 +142,9 @@ fun HomeScreen(
                 selected = sourceMode,
                 onSelectionChanged = { mode ->
                     sourceMode = mode
+                    scope.launch {
+                        settingsRepository.setSourceMode(mode)
+                    }
                 }
             )
 

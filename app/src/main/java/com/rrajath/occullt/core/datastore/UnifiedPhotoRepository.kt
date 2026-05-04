@@ -16,34 +16,32 @@ class UnifiedPhotoRepository(
 ) {
     private val localRepo = LocalPhotoRepository(context)
 
+    data class PaginatedResult(
+        val photos: List<UnifiedPhotoItem>,
+        val hasMore: Boolean,
+        val nextCreatedBefore: String?,
+    )
+
     suspend fun loadPhotos(
         sourceMode: SourceMode,
         folderUri: String? = null,
     ): Result<List<UnifiedPhotoItem>> = withContext(Dispatchers.IO) {
         try {
             if (sourceMode == SourceMode.Local) {
-                val localPhotos = when {
-                    folderUri == "mediastore" -> {
-                        localRepo.loadCameraPhotosFromMediaStore(context).map { it.toUnified(PhotoSource.Local) }
-                    }
-                    folderUri != null -> {
-                        val uri = Uri.parse(folderUri)
-                        localRepo.getPhotosFromFolder(uri).map { it.toUnified(PhotoSource.Local) }
-                    }
-                    else -> emptyList()
+                val localPhotos = if (folderUri.isNullOrBlank() || folderUri.contains("DCIM") && folderUri.contains("Camera")) {
+                    localRepo.loadCameraPhotosFromMediaStore(context).map { it.toUnified(PhotoSource.Local) }
+                } else {
+                    val uri = Uri.parse(folderUri)
+                    localRepo.getPhotosFromFolder(uri).map { it.toUnified(PhotoSource.Local) }
                 }
                 return@withContext Result.success(localPhotos)
             }
 
-            val localPhotos = when {
-                folderUri == "mediastore" -> {
-                    localRepo.loadCameraPhotosFromMediaStore(context).map { it.toUnified(PhotoSource.Local) }
-                }
-                folderUri != null -> {
-                    val uri = Uri.parse(folderUri)
-                    localRepo.getPhotosFromFolder(uri).map { it.toUnified(PhotoSource.Local) }
-                }
-                else -> emptyList()
+            val localPhotos = if (folderUri.isNullOrBlank() || (folderUri.contains("DCIM") && folderUri.contains("Camera"))) {
+                localRepo.loadCameraPhotosFromMediaStore(context).map { it.toUnified(PhotoSource.Local) }
+            } else {
+                val uri = Uri.parse(folderUri)
+                localRepo.getPhotosFromFolder(uri).map { it.toUnified(PhotoSource.Local) }
             }
 
             val immichPhotos = when {
@@ -61,6 +59,70 @@ class UnifiedPhotoRepository(
             }
 
             Result.success(merged)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun loadPhotosPaginated(
+        sourceMode: SourceMode,
+        folderUri: String? = null,
+        createdAfter: String? = null,
+        createdBefore: String? = null,
+    ): Result<PaginatedResult> = withContext(Dispatchers.IO) {
+        try {
+            if (sourceMode == SourceMode.Immich && immichRepository != null) {
+                if (createdAfter == null) {
+                    val sevenDaysAgo = java.util.Calendar.getInstance().apply {
+                        add(java.util.Calendar.DAY_OF_YEAR, -7)
+                    }.time
+                    val createdAfterStr = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", java.util.Locale.US).format(sevenDaysAgo)
+                    val result = immichRepository.searchPhotosByDateRange(
+                        createdAfter = createdAfterStr,
+                        createdBefore = createdBefore,
+                    )
+                    return@withContext result.map {
+                        PaginatedResult(
+                            photos = it.photos,
+                            hasMore = it.hasMore,
+                            nextCreatedBefore = it.nextCreatedBefore,
+                        )
+                    }
+                } else {
+                    val result = immichRepository.searchPhotosByDateRange(
+                        createdAfter = createdAfter,
+                        createdBefore = createdBefore,
+                    )
+                    return@withContext result.map {
+                        PaginatedResult(
+                            photos = it.photos,
+                            hasMore = it.hasMore,
+                            nextCreatedBefore = it.nextCreatedBefore,
+                        )
+                    }
+                }
+            }
+
+            val localPhotos = if (folderUri.isNullOrBlank() || (folderUri.contains("DCIM") && folderUri.contains("Camera"))) {
+                val t1 = System.currentTimeMillis()
+                val result = localRepo.loadCameraPhotosFromMediaStore(context)
+                android.util.Log.d("LibraryPerf", "MediaStore path took ${System.currentTimeMillis() - t1}ms")
+                result.map { it.toUnified(PhotoSource.Local) }
+            } else {
+                val t1 = System.currentTimeMillis()
+                val uri = Uri.parse(folderUri)
+                val result = localRepo.getPhotosFromFolder(uri)
+                android.util.Log.d("LibraryPerf", "DocumentFile path took ${System.currentTimeMillis() - t1}ms")
+                result.map { it.toUnified(PhotoSource.Local) }
+            }
+
+            Result.success(
+                PaginatedResult(
+                    photos = localPhotos,
+                    hasMore = false,
+                    nextCreatedBefore = null,
+                )
+            )
         } catch (e: Exception) {
             Result.failure(e)
         }

@@ -16,8 +16,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.itemsIndexed
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
@@ -26,6 +28,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -43,7 +46,6 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
-import coil3.request.crossfade
 import com.rrajath.occullt.core.datastore.PhotoCache
 import com.rrajath.occullt.core.datastore.SettingsRepository
 import com.rrajath.occullt.core.model.PhotoSource
@@ -201,7 +203,24 @@ fun LibraryScreen(
                 )
             }
         } else {
+            val gridState = rememberLazyGridState()
+            val shouldLoadMore by remember {
+                derivedStateOf {
+                    val layoutInfo = gridState.layoutInfo
+                    val totalItems = layoutInfo.totalItemsCount
+                    val lastVisibleItem = layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
+                    totalItems > 0 && lastVisibleItem >= totalItems - 6
+                }
+            }
+
+            LaunchedEffect(shouldLoadMore) {
+                if (shouldLoadMore && state.hasMore && !state.isLoadingMore) {
+                    viewModel.loadMorePhotos()
+                }
+            }
+
             LazyVerticalGrid(
+                state = gridState,
                 columns = GridCells.Fixed(3),
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
                 verticalArrangement = Arrangement.spacedBy(6.dp),
@@ -209,7 +228,10 @@ fun LibraryScreen(
                     .fillMaxWidth()
                     .padding(horizontal = 12.dp, vertical = 6.dp)
             ) {
-                itemsIndexed(state.photos) { index, photo ->
+                itemsIndexed(
+                    items = state.photos,
+                    key = { _, photo -> photo.id }
+                ) { index, photo ->
                     val isMarked = state.markedIds.contains(photo.id)
                     val isPinned = state.pinnedId == photo.id
 
@@ -217,6 +239,7 @@ fun LibraryScreen(
                         modifier = Modifier
                             .aspectRatio(0.75f)
                             .clip(RoundedCornerShape(14.dp))
+                            .background(colors.line.copy(alpha = 0.3f))
                             .clickable {
                                 PhotoCache.setPhotos(state.photos)
                                 val uri = when (photo.source) {
@@ -228,14 +251,18 @@ fun LibraryScreen(
                     ) {
                         val imageUrl = when (photo.source) {
                             PhotoSource.Local -> photo.uri
-                            PhotoSource.Immich -> photo.previewUrl ?: photo.uri
+                            PhotoSource.Immich -> photo.thumbnailUrl ?: photo.previewUrl ?: photo.uri
+                        }
+
+                        val requestBuilder = ImageRequest.Builder(LocalContext.current)
+                            .data(imageUrl)
+
+                        if (photo.source == PhotoSource.Local) {
+                            requestBuilder.size(300, 300)
                         }
 
                         AsyncImage(
-                            model = ImageRequest.Builder(LocalContext.current)
-                                .data(imageUrl)
-                                .crossfade(false)
-                                .build(),
+                            model = requestBuilder.build(),
                             contentDescription = photo.name,
                             contentScale = ContentScale.Crop,
                             modifier = Modifier.fillMaxSize(),
@@ -282,6 +309,23 @@ fun LibraryScreen(
                                     modifier = Modifier.size(12.dp)
                                 )
                             }
+                        }
+                    }
+                }
+
+                if (state.hasMore || state.isLoadingMore) {
+                    item {
+                        Box(
+                            modifier = Modifier
+                                .aspectRatio(0.75f)
+                                .fillMaxWidth(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            CircularProgressIndicator(
+                                color = colors.accent,
+                                modifier = Modifier.size(32.dp),
+                                strokeWidth = 2.dp
+                            )
                         }
                     }
                 }
