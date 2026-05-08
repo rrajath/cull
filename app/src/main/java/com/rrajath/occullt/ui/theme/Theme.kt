@@ -1,12 +1,13 @@
 package com.rrajath.occullt.ui.theme
 
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Immutable
-import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.runtime.compositionLocalOf
+import androidx.compose.runtime.key
 import androidx.compose.ui.graphics.Color
 
 @Immutable
@@ -27,7 +28,12 @@ data class ExtendedColorScheme(
     val scrim: Color,
 )
 
-private val DarkExtendedColorScheme = ExtendedColorScheme(
+private fun accentPalette(index: Int): AccentColor {
+    val i = if (index in CatppuccinAccents.indices) index else 0
+    return CatppuccinAccents[i]
+}
+
+private fun DarkExtendedColorScheme(accentIndex: Int) = ExtendedColorScheme(
     bg = DarkBg,
     bgElev = DarkBgElev,
     bgElev2 = DarkBgElev2,
@@ -36,15 +42,15 @@ private val DarkExtendedColorScheme = ExtendedColorScheme(
     fg = DarkFg,
     fgDim = DarkFgDim,
     fgFaint = DarkFgFaint,
-    accent = AccentTangerine,
-    accentSoft = AccentTangerineSoft,
+    accent = accentPalette(accentIndex).color,
+    accentSoft = accentPalette(accentIndex).softDark,
     danger = Danger,
     dangerSoft = DangerSoft,
     pin = Pin,
     scrim = DarkScrim,
 )
 
-private val LightExtendedColorScheme = ExtendedColorScheme(
+private fun LightExtendedColorScheme(accentIndex: Int) = ExtendedColorScheme(
     bg = LightBg,
     bgElev = LightBgElev,
     bgElev2 = LightBgElev2,
@@ -53,8 +59,8 @@ private val LightExtendedColorScheme = ExtendedColorScheme(
     fg = LightFg,
     fgDim = LightFgDim,
     fgFaint = LightFgFaint,
-    accent = AccentTangerine,
-    accentSoft = LightAccentTangerineSoft,
+    accent = accentPalette(accentIndex).color,
+    accentSoft = accentPalette(accentIndex).softLight,
     danger = Danger,
     dangerSoft = LightDangerSoft,
     pin = Pin,
@@ -75,20 +81,25 @@ private val LightColorScheme = lightColorScheme(
     onSurface = LightFg,
 )
 
-val LocalExtendedColorScheme = staticCompositionLocalOf { DarkExtendedColorScheme }
+val LocalExtendedColorScheme = compositionLocalOf { DarkExtendedColorScheme(0) }
 
 @Composable
 fun OcculltTheme(
     darkTheme: Boolean = true,
     dynamicColor: Boolean = false,
+    accentIndex: Int = 0,
     content: @Composable () -> Unit
 ) {
     val colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme
-    val extendedColorScheme = if (darkTheme) DarkExtendedColorScheme else LightExtendedColorScheme
+    val extendedColorScheme = if (darkTheme) DarkExtendedColorScheme(accentIndex) else LightExtendedColorScheme(accentIndex)
 
-    MaterialTheme(
-        colorScheme = colorScheme,
-        typography = Typography,
-        content = content
-    )
+    key(accentIndex) {
+        CompositionLocalProvider(LocalExtendedColorScheme provides extendedColorScheme) {
+            MaterialTheme(
+                colorScheme = colorScheme,
+                typography = Typography,
+                content = content
+            )
+        }
+    }
 }

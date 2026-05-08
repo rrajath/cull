@@ -14,6 +14,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import com.rrajath.occullt.core.datastore.SettingsRepository
 import com.rrajath.occullt.navigation.OcculltNavHost
+import com.rrajath.occullt.ui.theme.CatppuccinAccents
 import com.rrajath.occullt.ui.theme.OcculltTheme
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.runBlocking
@@ -26,6 +27,7 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             var darkTheme by mutableStateOf(true)
+            var accentIndex by mutableStateOf(0)
 
             LaunchedEffect(settingsRepository) {
                 settingsRepository.darkTheme.collectLatest { isDark ->
@@ -33,7 +35,13 @@ class MainActivity : ComponentActivity() {
                 }
             }
 
-            OcculltTheme(darkTheme = darkTheme) {
+            LaunchedEffect(settingsRepository) {
+                settingsRepository.accentHue.collectLatest { hue ->
+                    accentIndex = if (hue in CatppuccinAccents.indices) hue else 0
+                }
+            }
+
+            OcculltTheme(darkTheme = darkTheme, accentIndex = accentIndex) {
                 Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
                     OcculltNavHost(
                         modifier = Modifier.padding(innerPadding),

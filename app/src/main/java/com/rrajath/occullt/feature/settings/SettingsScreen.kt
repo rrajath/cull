@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -50,6 +51,7 @@ import com.rrajath.occullt.ui.component.SliderRow
 import com.rrajath.occullt.ui.component.SourceMode
 import com.rrajath.occullt.ui.component.ToggleRow
 import com.rrajath.occullt.ui.icon.CullIcons
+import com.rrajath.occullt.ui.theme.CatppuccinAccents
 import com.rrajath.occullt.ui.theme.LocalExtendedColorScheme
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
@@ -78,7 +80,7 @@ fun SettingsScreen(
     var dryRun by remember { mutableStateOf(false) }
     var mirrorDeletes by remember { mutableStateOf(false) }
     var darkTheme by remember { mutableStateOf(true) }
-    var accentHue by remember { mutableStateOf(40) }
+    var accentHue by remember { mutableStateOf(0) }
     var connectionState by remember { mutableStateOf<ConnectionState>(ConnectionState.NotTested) }
     var isTesting by remember { mutableStateOf(false) }
 
@@ -471,18 +473,17 @@ fun SettingsScreen(
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
+                                .horizontalScroll(rememberScrollState())
                                 .padding(top = 8.dp),
                             horizontalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
-                            listOf(0, 40, 120, 200, 280).forEach { hue ->
-                                val isSelected = accentHue == hue
+                            CatppuccinAccents.forEachIndexed { index, catppuccin ->
+                                val isSelected = accentHue == index
                                 Box(
                                     modifier = Modifier
                                         .size(36.dp)
                                         .clip(CircleShape)
-                                        .background(
-                                            Color.hsl(hue.toFloat(), 0.7f, 0.55f)
-                                        )
+                                        .background(catppuccin.color)
                                         .then(
                                             if (isSelected) {
                                                 Modifier.border(
@@ -495,9 +496,9 @@ fun SettingsScreen(
                                             }
                                         )
                                         .clickable {
-                                            accentHue = hue
+                                            accentHue = index
                                             scope.launch {
-                                                settingsRepository.setAccentHue(hue)
+                                                settingsRepository.setAccentHue(index)
                                             }
                                         }
                                 )

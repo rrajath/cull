@@ -22,17 +22,18 @@ val LightFgDim = Color(0xA314120E)
 val LightFgFaint = Color(0x6614120E)
 val LightScrim = Color(0x8C000000)
 
-val AccentTangerine = Color(0xFFE8854A)
-val AccentTangerineSoft = Color(0xFF3A2318)
-val LightAccentTangerineSoft = Color(0xFFF5E8DC)
-val Accent25 = Color(0xFFE86B4A)
-val Accent25Soft = Color(0xFF3A1C18)
-val Accent150 = Color(0xFF4AE8A0)
-val Accent150Soft = Color(0xFF183A2A)
-val Accent220 = Color(0xFF4AA0E8)
-val Accent220Soft = Color(0xFF182A3A)
-val Accent300 = Color(0xFFA04AE8)
-val Accent300Soft = Color(0xFF2A183A)
+data class AccentColor(val color: Color, val softDark: Color, val softLight: Color)
+
+val CatppuccinAccents = listOf(
+    AccentColor(Color(0xFFc6a0f6), Color(0xFF362a48), Color(0xFFe8daf6)), // Mauve
+    AccentColor(Color(0xFFf5a97f), Color(0xFF3d281e), Color(0xFFf5dccc)), // Peach
+    AccentColor(Color(0xFFeed49f), Color(0xFF3d331e), Color(0xFFf5ecd2)), // Yellow
+    AccentColor(Color(0xFFa6da95), Color(0xFF273a1e), Color(0xFFdcf0d4)), // Green
+    AccentColor(Color(0xFF8aadf4), Color(0xFF1e2e3d), Color(0xFFd4e2f5)), // Blue
+    AccentColor(Color(0xFFf5bde6), Color(0xFF3d1e34), Color(0xFFf5dcee)), // Pink
+    AccentColor(Color(0xFFed8796), Color(0xFF3d1e24), Color(0xFFf5d4da)), // Red
+    AccentColor(Color(0xFF8bd5ca), Color(0xFF1e3d38), Color(0xFFd4f0ec)), // Teal
+)
 
 val Danger = Color(0xFFD94F35)
 val DangerSoft = Color(0xFF4A1F18)

@@ -68,7 +68,8 @@ class SettingsRepository(context: Context) {
     }
 
     val accentHue: Flow<Int> = dataStore.data.map { prefs ->
-        prefs[Keys.ACCENT_HUE] ?: 40
+        val raw = prefs[Keys.ACCENT_HUE] ?: 0
+        if (raw in 0..7) raw else 0
     }
 
     val lastPhotoIndex: Flow<Int> = dataStore.data.map { prefs ->
