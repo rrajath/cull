@@ -4,10 +4,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Immutable
-import androidx.compose.runtime.compositionLocalOf
-import androidx.compose.runtime.key
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.Color
 
 @Immutable
@@ -81,7 +81,9 @@ private val LightColorScheme = lightColorScheme(
     onSurface = LightFg,
 )
 
-val LocalExtendedColorScheme = compositionLocalOf { DarkExtendedColorScheme(0) }
+object ThemeColors {
+    var current by mutableStateOf(DarkExtendedColorScheme(0))
+}
 
 @Composable
 fun OcculltTheme(
@@ -90,16 +92,12 @@ fun OcculltTheme(
     accentIndex: Int = 0,
     content: @Composable () -> Unit
 ) {
-    val colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme
-    val extendedColorScheme = if (darkTheme) DarkExtendedColorScheme(accentIndex) else LightExtendedColorScheme(accentIndex)
+    val scheme = if (darkTheme) DarkExtendedColorScheme(accentIndex) else LightExtendedColorScheme(accentIndex)
+    ThemeColors.current = scheme
 
-    key(accentIndex) {
-        CompositionLocalProvider(LocalExtendedColorScheme provides extendedColorScheme) {
-            MaterialTheme(
-                colorScheme = colorScheme,
-                typography = Typography,
-                content = content
-            )
-        }
-    }
+    MaterialTheme(
+        colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme,
+        typography = Typography,
+        content = content
+    )
 }

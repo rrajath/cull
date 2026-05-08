@@ -36,7 +36,7 @@ import com.rrajath.occullt.ui.component.GiantButton
 import com.rrajath.occullt.ui.component.SourceMode
 import com.rrajath.occullt.ui.component.SourceSwitcher
 import com.rrajath.occullt.ui.icon.CullIcons
-import com.rrajath.occullt.ui.theme.LocalExtendedColorScheme
+import com.rrajath.occullt.ui.theme.ThemeColors
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
@@ -48,7 +48,7 @@ fun HomeScreen(
     settingsRepository: SettingsRepository,
     modifier: Modifier = Modifier,
 ) {
-    val colors = LocalExtendedColorScheme.current
+    val colors = ThemeColors.current
     val scope = rememberCoroutineScope()
     var sourceMode by remember { mutableStateOf(SourceMode.Hybrid) }
     var hasSession by remember { mutableStateOf(false) }
@@ -199,7 +199,7 @@ fun HomeScreen(
 private fun CullMark(
     modifier: Modifier = Modifier,
 ) {
-    val colors = LocalExtendedColorScheme.current
+    val colors = ThemeColors.current
     Text(
         text = "CullQwen",
         style = androidx.compose.material3.MaterialTheme.typography.headlineLarge.copy(

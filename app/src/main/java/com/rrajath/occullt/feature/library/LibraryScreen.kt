@@ -51,7 +51,7 @@ import com.rrajath.occullt.core.model.PhotoSource
 import com.rrajath.occullt.ui.component.CircleIcon
 import com.rrajath.occullt.ui.component.SourceMode
 import com.rrajath.occullt.ui.icon.CullIcons
-import com.rrajath.occullt.ui.theme.LocalExtendedColorScheme
+import com.rrajath.occullt.ui.theme.ThemeColors
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.first
@@ -68,7 +68,7 @@ fun LibraryScreen(
         factory = LibraryViewModelFactory(LocalContext.current.applicationContext, settingsRepository)
     )
     val state by viewModel.state.collectAsState()
-    val colors = LocalExtendedColorScheme.current
+    val colors = ThemeColors.current
     val context = LocalContext.current
 
     var permissionGranted by remember { mutableStateOf(false) }

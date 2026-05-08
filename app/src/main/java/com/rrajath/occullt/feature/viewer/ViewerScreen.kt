@@ -86,7 +86,7 @@ import com.rrajath.occullt.core.network.ImmichApi
 import com.rrajath.occullt.core.network.ImmichRepository
 import com.rrajath.occullt.ui.component.SourceMode
 import com.rrajath.occullt.ui.icon.CullIcons
-import com.rrajath.occullt.ui.theme.LocalExtendedColorScheme
+import com.rrajath.occullt.ui.theme.ThemeColors
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.first
@@ -104,7 +104,7 @@ fun ViewerScreen(
 ) {
     val viewModel: ViewerViewModel = viewModel()
     val state by viewModel.state.collectAsState()
-    val colors = LocalExtendedColorScheme.current
+    val colors = ThemeColors.current
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
@@ -507,7 +507,7 @@ private fun ViewerPhotoPage(
     onMarkToggle: () -> Unit,
     onZoomStateChanged: (Boolean) -> Unit,
 ) {
-    val colors = LocalExtendedColorScheme.current
+    val colors = ThemeColors.current
 
     val displayPhoto = if (isShowingPinned && pinnedPhoto != null) pinnedPhoto else photo
 
@@ -745,7 +745,7 @@ private fun HudPill(
     onClearMarks: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val colors = LocalExtendedColorScheme.current
+    val colors = ThemeColors.current
 
     Column(
         modifier = modifier
@@ -901,7 +901,7 @@ private fun DeleteConfirmationDialog(
     isDeleting: Boolean,
     deleteSuccess: Boolean,
 ) {
-    val colors = LocalExtendedColorScheme.current
+    val colors = ThemeColors.current
     val sheetState = rememberModalBottomSheetState(
         skipPartiallyExpanded = false
     )
@@ -1078,7 +1078,7 @@ fun HudRail(
     onConfirm: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val colors = LocalExtendedColorScheme.current
+    val colors = ThemeColors.current
 
     Column(
         modifier = modifier
@@ -1148,7 +1148,7 @@ fun HudBar(
     onConfirm: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val colors = LocalExtendedColorScheme.current
+    val colors = ThemeColors.current
 
     Box(
         modifier = modifier

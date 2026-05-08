@@ -28,7 +28,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.rrajath.occullt.ui.theme.GiantButtonSubtitleStyle
 import com.rrajath.occullt.ui.theme.GiantButtonTitleStyle
-import com.rrajath.occullt.ui.theme.LocalExtendedColorScheme
+import com.rrajath.occullt.ui.theme.ThemeColors
 
 @Composable
 fun GiantButton(
@@ -41,7 +41,7 @@ fun GiantButton(
     accentBackground: Boolean = true,
     minHeight: Dp = 160.dp,
 ) {
-    val colors = LocalExtendedColorScheme.current
+    val colors = ThemeColors.current
     Box(
         modifier = modifier
             .fillMaxWidth()
@@ -113,7 +113,7 @@ fun CircleIcon(
     modifier: Modifier = Modifier,
     icon: @Composable () -> Unit,
 ) {
-    val colors = LocalExtendedColorScheme.current
+    val colors = ThemeColors.current
     Box(
         modifier = modifier
             .size(44.dp)
@@ -134,7 +134,7 @@ fun ContinuePill(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val colors = LocalExtendedColorScheme.current
+    val colors = ThemeColors.current
     Row(
         modifier = modifier
             .clip(RoundedCornerShape(999.dp))
@@ -181,7 +181,7 @@ fun SourceSwitcher(
     onSelectionChanged: (SourceMode) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val colors = LocalExtendedColorScheme.current
+    val colors = ThemeColors.current
     Row(
         modifier = modifier
             .clip(RoundedCornerShape(999.dp))
@@ -231,7 +231,7 @@ fun SectionLabel(
     text: String,
     modifier: Modifier = Modifier,
 ) {
-    val colors = LocalExtendedColorScheme.current
+    val colors = ThemeColors.current
     Text(
         text = text,
         style = androidx.compose.material3.MaterialTheme.typography.labelLarge.copy(
@@ -248,7 +248,7 @@ fun SectionLabel(
 fun Div(
     modifier: Modifier = Modifier,
 ) {
-    val colors = LocalExtendedColorScheme.current
+    val colors = ThemeColors.current
     Box(
         modifier = modifier
             .fillMaxWidth()
@@ -267,7 +267,7 @@ fun Row(
     action: @Composable (RowScope.() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
-    val colors = LocalExtendedColorScheme.current
+    val colors = ThemeColors.current
     androidx.compose.foundation.layout.Row(
         modifier = modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
@@ -316,7 +316,7 @@ fun ToggleRow(
     onCheckedChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val colors = LocalExtendedColorScheme.current
+    val colors = ThemeColors.current
     androidx.compose.foundation.layout.Row(
         modifier = modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
@@ -354,7 +354,7 @@ fun SliderRow(
     modifier: Modifier = Modifier,
     valueRange: ClosedFloatingPointRange<Float> = 80f..800f,
 ) {
-    val colors = LocalExtendedColorScheme.current
+    val colors = ThemeColors.current
     Column(
         modifier = modifier.fillMaxWidth()
     ) {

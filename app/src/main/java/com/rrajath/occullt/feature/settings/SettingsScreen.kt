@@ -52,7 +52,7 @@ import com.rrajath.occullt.ui.component.SourceMode
 import com.rrajath.occullt.ui.component.ToggleRow
 import com.rrajath.occullt.ui.icon.CullIcons
 import com.rrajath.occullt.ui.theme.CatppuccinAccents
-import com.rrajath.occullt.ui.theme.LocalExtendedColorScheme
+import com.rrajath.occullt.ui.theme.ThemeColors
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
@@ -68,7 +68,7 @@ fun SettingsScreen(
     settingsRepository: SettingsRepository,
     modifier: Modifier = Modifier,
 ) {
-    val colors = LocalExtendedColorScheme.current
+    val colors = ThemeColors.current
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
@@ -516,7 +516,7 @@ private fun Section(
     text: String,
     content: @Composable () -> Unit,
 ) {
-    val colors = LocalExtendedColorScheme.current
+    val colors = ThemeColors.current
     Column(
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
@@ -532,7 +532,7 @@ private fun SourceModeCard(
     selected: Boolean,
     onClick: () -> Unit,
 ) {
-    val colors = LocalExtendedColorScheme.current
+    val colors = ThemeColors.current
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -592,7 +592,7 @@ private fun SettingsInputRow(
     onValueChange: (String) -> Unit,
     placeholder: String,
 ) {
-    val colors = LocalExtendedColorScheme.current
+    val colors = ThemeColors.current
     Column {
         Text(
             text = label,
