@@ -199,7 +199,7 @@ class ImmichApi(
     }
 
     fun getPreviewUrl(assetId: String): String {
-        return "$baseUrl/api/assets/$assetId/preview"
+        return "$baseUrl/api/assets/$assetId/original"
     }
 
     fun getOriginalUrl(assetId: String): String {
@@ -236,37 +236,14 @@ class ImmichApi(
         }
     }
 
-    suspend fun deleteAsset(assetId: String): Result<Unit> = withContext(Dispatchers.IO) {
-        try {
-            val url = "$baseUrl/api/assets"
-            val body = """{"ids":["$assetId"]}"""
-
-            val request = Request.Builder()
-                .url(url)
-                .addHeader("x-api-key", apiKey)
-                .addHeader("Content-Type", "application/json")
-                .delete(RequestBody.create("application/json".toMediaType(), body))
-                .build()
-
-            val response = client.newCall(request).execute()
-
-            if (!response.isSuccessful) {
-                Result.failure(Exception("HTTP ${response.code}: ${response.message}"))
-            } else {
-                Result.success(Unit)
-            }
-        } catch (e: IOException) {
-            Result.failure(Exception("Network error: ${e.message ?: e.javaClass.simpleName}"))
-        } catch (e: Exception) {
-            Result.failure(Exception("Error: ${e.message ?: e.javaClass.simpleName}"))
-        }
-    }
-
-    suspend fun deleteAssets(assetIds: List<String>): Result<Unit> = withContext(Dispatchers.IO) {
+    suspend fun deleteAssets(
+        assetIds: List<String>,
+        force: Boolean = false,
+    ): Result<Unit> = withContext(Dispatchers.IO) {
         try {
             val url = "$baseUrl/api/assets"
             val idsJson = assetIds.joinToString(",", prefix = "[\"", postfix = "\"]")
-            val body = """{"ids":$idsJson}"""
+            val body = """{"ids":$idsJson,"force":$force}"""
 
             val request = Request.Builder()
                 .url(url)

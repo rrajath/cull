@@ -22,6 +22,12 @@ class UnifiedPhotoRepository(
         val nextCreatedBefore: String?,
     )
 
+    data class DeleteSummary(
+        val localDeleted: Int = 0,
+        val immichDeleted: Int = 0,
+        val immichError: String? = null,
+    )
+
     suspend fun loadPhotos(
         sourceMode: SourceMode,
         folderUri: String? = null,
@@ -35,6 +41,17 @@ class UnifiedPhotoRepository(
                     localRepo.getPhotosFromFolder(uri).map { it.toUnified(PhotoSource.Local) }
                 }
                 return@withContext Result.success(localPhotos)
+            }
+
+            if (sourceMode == SourceMode.Immich) {
+                val immichPhotos = when {
+                    immichRepository == null -> emptyList()
+                    else -> {
+                        val result = immichRepository.getAllPhotos()
+                        result.getOrNull().orEmpty()
+                    }
+                }
+                return@withContext Result.success(immichPhotos)
             }
 
             val localPhotos = if (folderUri.isNullOrBlank() || (folderUri.contains("DCIM") && folderUri.contains("Camera"))) {
@@ -52,13 +69,9 @@ class UnifiedPhotoRepository(
                 }
             }
 
-            val merged = when (sourceMode) {
-                SourceMode.Immich -> immichPhotos
-                SourceMode.Hybrid -> mergePhotoLists(localPhotos, immichPhotos)
-                SourceMode.Local -> localPhotos
-            }
+            val hybridPhotos = intersectPhotoLists(localPhotos, immichPhotos)
 
-            Result.success(merged)
+            Result.success(hybridPhotos)
         } catch (e: Exception) {
             Result.failure(e)
         }
@@ -71,7 +84,10 @@ class UnifiedPhotoRepository(
         createdBefore: String? = null,
     ): Result<PaginatedResult> = withContext(Dispatchers.IO) {
         try {
-            if (sourceMode == SourceMode.Immich && immichRepository != null) {
+            var immichHasMore = false
+            var immichNextCreatedBefore: String? = null
+
+            val immichPhotos = if ((sourceMode == SourceMode.Immich || sourceMode == SourceMode.Hybrid) && immichRepository != null) {
                 if (createdAfter == null) {
                     val sevenDaysAgo = java.util.Calendar.getInstance().apply {
                         add(java.util.Calendar.DAY_OF_YEAR, -7)
@@ -81,26 +97,32 @@ class UnifiedPhotoRepository(
                         createdAfter = createdAfterStr,
                         createdBefore = createdBefore,
                     )
-                    return@withContext result.map {
-                        PaginatedResult(
-                            photos = it.photos,
-                            hasMore = it.hasMore,
-                            nextCreatedBefore = it.nextCreatedBefore,
-                        )
-                    }
+                    val paginated = result.getOrNull()
+                    immichHasMore = paginated?.hasMore ?: false
+                    immichNextCreatedBefore = paginated?.nextCreatedBefore
+                    paginated?.photos.orEmpty()
                 } else {
                     val result = immichRepository.searchPhotosByDateRange(
                         createdAfter = createdAfter,
                         createdBefore = createdBefore,
                     )
-                    return@withContext result.map {
-                        PaginatedResult(
-                            photos = it.photos,
-                            hasMore = it.hasMore,
-                            nextCreatedBefore = it.nextCreatedBefore,
-                        )
-                    }
+                    val paginated = result.getOrNull()
+                    immichHasMore = paginated?.hasMore ?: false
+                    immichNextCreatedBefore = paginated?.nextCreatedBefore
+                    paginated?.photos.orEmpty()
                 }
+            } else {
+                emptyList()
+            }
+
+            if (sourceMode == SourceMode.Immich) {
+                return@withContext Result.success(
+                    PaginatedResult(
+                        photos = immichPhotos,
+                        hasMore = immichHasMore,
+                        nextCreatedBefore = immichNextCreatedBefore,
+                    )
+                )
             }
 
             val localPhotos = if (folderUri.isNullOrBlank() || (folderUri.contains("DCIM") && folderUri.contains("Camera"))) {
@@ -116,11 +138,17 @@ class UnifiedPhotoRepository(
                 result.map { it.toUnified(PhotoSource.Local) }
             }
 
+            val hybridPhotos = if (sourceMode == SourceMode.Hybrid) {
+                intersectPhotoLists(localPhotos, immichPhotos)
+            } else {
+                localPhotos
+            }
+
             Result.success(
                 PaginatedResult(
-                    photos = localPhotos,
-                    hasMore = false,
-                    nextCreatedBefore = null,
+                    photos = hybridPhotos,
+                    hasMore = immichHasMore,
+                    nextCreatedBefore = immichNextCreatedBefore,
                 )
             )
         } catch (e: Exception) {
@@ -128,35 +156,65 @@ class UnifiedPhotoRepository(
         }
     }
 
-    private fun mergePhotoLists(
+    private fun intersectPhotoLists(
         local: List<UnifiedPhotoItem>,
         immich: List<UnifiedPhotoItem>,
     ): List<UnifiedPhotoItem> {
-        val merged = mutableListOf<UnifiedPhotoItem>()
-        val allPhotos = local + immich
-        merged.addAll(allPhotos.sortedByDescending { it.dateModified })
-        return merged
+        val immichByName = immich.associateBy { it.name }
+        val result = mutableListOf<UnifiedPhotoItem>()
+
+        for (localPhoto in local) {
+            val matchingImmich = immichByName[localPhoto.name]
+            if (matchingImmich != null) {
+                result.add(
+                    localPhoto.copy(
+                        isOnImmich = true,
+                        immichAssetId = matchingImmich.immichAssetId,
+                        thumbnailUrl = matchingImmich.thumbnailUrl,
+                        previewUrl = matchingImmich.previewUrl,
+                        originalUrl = matchingImmich.originalUrl,
+                    )
+                )
+            }
+        }
+
+        return result.sortedByDescending { it.dateModified }
     }
 
     suspend fun deletePhotos(
         photos: List<UnifiedPhotoItem>,
         mirrorDeletes: Boolean = false,
-    ): Result<Unit> = withContext(Dispatchers.IO) {
+    ): Result<DeleteSummary> = withContext(Dispatchers.IO) {
         try {
-            val localPhotos = photos.filter { it.source == PhotoSource.Local && it.isOnDevice }
-            val immichPhotos = photos.filter { it.source == PhotoSource.Immich && it.isOnImmich }
+            val localPhotos = photos.filter { it.isOnDevice }
 
             if (localPhotos.isNotEmpty()) {
                 val urisToDelete = localPhotos.map { it.uri }
                 deletePhotosViaMediaStore(urisToDelete)
             }
 
-            if (immichPhotos.isNotEmpty() && mirrorDeletes && immichRepository != null) {
-                val immichIds = immichPhotos.mapNotNull { it.immichAssetId }
-                immichRepository.deletePhotos(immichIds)
+            var immichDeleted = 0
+            var immichError: String? = null
+
+            if (immichRepository != null) {
+                val immichIds = photos.mapNotNull {
+                    if (it.isOnImmich && it.immichAssetId != null) it.immichAssetId else null
+                }
+                if (immichIds.isNotEmpty()) {
+                    val result = immichRepository.deletePhotos(immichIds)
+                    if (result.isSuccess) {
+                        immichDeleted = immichIds.size
+                    } else {
+                        immichError = result.exceptionOrNull()?.message ?: "Unknown error"
+                    }
+                }
             }
 
-            Result.success(Unit)
+            Result.success(DeleteSummary(
+                localDeleted = localPhotos.size,
+                immichDeleted = immichDeleted,
+                immichError = immichError,
+            ))
         } catch (e: Exception) {
             Result.failure(e)
         }

@@ -1,9 +1,13 @@
 package com.rrajath.occullt.feature.viewer
 
 import android.content.ContentResolver
+import android.graphics.drawable.GradientDrawable
 import android.net.Uri
 import android.os.Build
 import android.provider.MediaStore
+import android.view.Gravity
+import android.widget.LinearLayout
+import android.widget.TextView
 import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
@@ -75,6 +79,7 @@ import com.rrajath.occullt.core.datastore.PhotoCache
 import com.rrajath.occullt.core.datastore.SettingsRepository
 import com.rrajath.occullt.core.database.ImmichAssetMappingDb
 import com.rrajath.occullt.core.datastore.UnifiedPhotoRepository
+import com.rrajath.occullt.core.datastore.UnifiedPhotoRepository.DeleteSummary
 import com.rrajath.occullt.core.model.PhotoSource
 import com.rrajath.occullt.core.model.UnifiedPhotoItem
 import com.rrajath.occullt.core.network.ImmichApi
@@ -93,6 +98,7 @@ fun ViewerScreen(
     photoIndex: Int,
     folderUri: String?,
     onNavigateBack: () -> Unit,
+    onDeleteCompleted: () -> Unit,
     settingsRepository: SettingsRepository,
     modifier: Modifier = Modifier,
 ) {
@@ -104,28 +110,36 @@ fun ViewerScreen(
 
     var photos by remember { mutableStateOf<List<UnifiedPhotoItem>>(emptyList()) }
     var isLoadingPhotos by remember { mutableStateOf(true) }
+    var immichApiKey by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(folderUri) {
         if (folderUri != null) {
+            val sourceMode = settingsRepository.sourceMode.first()
+            val immichUrl = settingsRepository.immichUrl.first()
+            val key = settingsRepository.immichApiKey.first()
+
+            if (sourceMode != SourceMode.Local && !immichUrl.isNullOrBlank() && !key.isNullOrBlank()) {
+                OcculltApplication.setImmichApiKey(key)
+                immichApiKey = key
+            } else {
+                OcculltApplication.setImmichApiKey(null)
+                immichApiKey = null
+            }
+
             val cached = PhotoCache.getPhotos()
             if (cached != null) {
                 photos = cached
                 isLoadingPhotos = false
             } else {
                 isLoadingPhotos = true
-                val sourceMode = settingsRepository.sourceMode.first()
 
                 val immichRepo = if (sourceMode == SourceMode.Local) {
                     null
                 } else {
-                    val immichUrl = settingsRepository.immichUrl.first()
-                    val immichApiKey = settingsRepository.immichApiKey.first()
-                    if (!immichUrl.isNullOrBlank() && !immichApiKey.isNullOrBlank()) {
-                        OcculltApplication.setImmichApiKey(immichApiKey)
+                    if (!immichUrl.isNullOrBlank() && !key.isNullOrBlank()) {
                         val mappingDb = ImmichAssetMappingDb.getInstance(context)
-                        ImmichRepository(ImmichApi(immichUrl, immichApiKey), mappingDb)
+                        ImmichRepository(ImmichApi(immichUrl, key), mappingDb)
                     } else {
-                        OcculltApplication.setImmichApiKey(null)
                         null
                     }
                 }
@@ -185,6 +199,9 @@ fun ViewerScreen(
             val sourceMode = settingsRepository.sourceMode.first()
 
             when {
+                currentPhoto.isOnImmich -> {
+                    viewModel.setIsOnImmich(true)
+                }
                 sourceMode == SourceMode.Local -> {
                     val immichUrl = settingsRepository.immichUrl.first()
                     val immichApiKey = settingsRepository.immichApiKey.first()
@@ -265,14 +282,14 @@ fun ViewerScreen(
                 isOnImmich = state.isOnImmich,
                 showPinnedBadge = isPinned || (state.isLongPressing && state.pinnedId == pinnedPhoto?.id),
                 sourceMode = photos.getOrNull(pagerState.currentPage)?.source ?: PhotoSource.Local,
+                immichApiKey = immichApiKey,
                 onToggleHud = { viewModel.toggleHud() },
                 onLongPress = {
                     if (state.pinnedId == photo.id) {
-                        Toast.makeText(
+                        showToast(
                             context,
-                            "Cannot compare a pinned image against itself",
-                            Toast.LENGTH_SHORT
-                        ).show()
+                            "Cannot compare a pinned image against itself"
+                        )
                     } else {
                         viewModel.setLongPressing(true)
                     }
@@ -369,10 +386,10 @@ fun ViewerScreen(
 
         if (state.showDeleteDialog) {
             val localMarkedCount = state.markedIds.count { id ->
-                photos.find { it.id == id }?.source == PhotoSource.Local
+                photos.find { it.id == id }?.isOnDevice == true
             }
             val immichMarkedCount = state.markedIds.count { id ->
-                photos.find { it.id == id }?.source == PhotoSource.Immich
+                photos.find { it.id == id }?.isOnImmich == true
             }
 
             DeleteConfirmationDialog(
@@ -385,11 +402,13 @@ fun ViewerScreen(
                         viewModel.setDeleting(true)
                         val dryRun = settingsRepository.dryRun.first()
                         val mirrorDeletes = settingsRepository.mirrorDeletes.first()
-                        
+
+                        var deleteSummary: DeleteSummary? = null
+
                         if (!dryRun) {
                             val immichUrl = settingsRepository.immichUrl.first()
                             val immichApiKey = settingsRepository.immichApiKey.first()
-                            
+
                             val immichRepo = if (!immichUrl.isNullOrBlank() && !immichApiKey.isNullOrBlank()) {
                                 val mappingDb = ImmichAssetMappingDb.getInstance(context)
                                 ImmichRepository(ImmichApi(immichUrl, immichApiKey), mappingDb)
@@ -402,22 +421,47 @@ fun ViewerScreen(
                                 photos.find { it.id == id }
                             }
 
-                            unifiedRepo.deletePhotos(photosToDelete, mirrorDeletes)
+                            val result = unifiedRepo.deletePhotos(photosToDelete, mirrorDeletes)
+                            deleteSummary = result.getOrNull()
                         }
-                        
+
                         delay(800)
                         viewModel.setDeleting(false)
                         viewModel.setDeleteSuccess(true)
-                        if (!dryRun) {
-                            viewModel.clearMarkedIds()
-                            settingsRepository.setMarkedIds(emptySet())
-                        } else {
+
+                        if (dryRun) {
                             viewModel.hideDeleteDialog()
-                            Toast.makeText(
+                            showToast(
                                 context,
                                 "Dry run mode enabled. No photos were deleted.",
-                                Toast.LENGTH_LONG
-                            ).show()
+                                longToast = true
+                            )
+                        } else {
+                            viewModel.clearMarkedIds()
+                            settingsRepository.setMarkedIds(emptySet())
+
+                            val summary = deleteSummary
+                            if (summary != null) {
+                                val parts = mutableListOf<String>()
+                                if (summary.localDeleted > 0) {
+                                    parts.add("${summary.localDeleted} from device")
+                                }
+                                if (summary.immichDeleted > 0) {
+                                    parts.add("${summary.immichDeleted} from Immich")
+                                }
+                                if (parts.isNotEmpty()) {
+                                    showToast(context, parts.joinToString(", ") + " deleted")
+                                }
+                                if (summary.immichError != null) {
+                                    showToast(
+                                        context,
+                                        "Failed to delete from Immich: ${summary.immichError}",
+                                        longToast = true
+                                    )
+                                }
+                            }
+                            viewModel.hideDeleteDialog()
+                            onDeleteCompleted()
                         }
                     }
                 },
@@ -454,6 +498,7 @@ private fun ViewerPhotoPage(
     isOnImmich: Boolean?,
     showPinnedBadge: Boolean,
     sourceMode: PhotoSource,
+    immichApiKey: String?,
     onToggleHud: () -> Unit,
     onLongPress: () -> Unit,
     onLongPressRelease: () -> Unit,
@@ -503,11 +548,11 @@ private fun ViewerPhotoPage(
                             if (event.changes.none { it.pressed }) {
                                 onLongPressRelease()
                                 break
-                            }
-                        }
-                    }
                 }
             }
+        }
+    }
+}
     ) {
         Box(
             modifier = Modifier
@@ -565,9 +610,16 @@ private fun ViewerPhotoPage(
                     }
                 }
         ) {
-            val imageUrl = when (displayPhoto.source) {
+            val imageUrl: Any = when (displayPhoto.source) {
                 PhotoSource.Local -> displayPhoto.uri
-                PhotoSource.Immich -> displayPhoto.previewUrl ?: displayPhoto.originalUrl ?: displayPhoto.uri
+                PhotoSource.Immich -> {
+                    val base = displayPhoto.originalUrl ?: displayPhoto.previewUrl ?: displayPhoto.uri.toString()
+                    if (!immichApiKey.isNullOrBlank()) {
+                        "$base${if (base.contains("?")) "&" else "?"}apiKey=$immichApiKey"
+                    } else {
+                        base
+                    }
+                }
             }
 
             AsyncImage(
@@ -575,7 +627,10 @@ private fun ViewerPhotoPage(
                     .data(imageUrl)
                     .listener(
                         onSuccess = { _, _ -> onLoadingChanged(false) },
-                        onError = { _, _ -> onLoadingChanged(false) }
+                        onError = { _, result ->
+                            android.util.Log.e("ViewerPhotoPage", "Failed to load image: $imageUrl, error: ${result.throwable?.message}")
+                            onLoadingChanged(false)
+                        }
                     )
                     .build(),
                 contentDescription = displayPhoto.name,
@@ -1183,4 +1238,27 @@ fun HudBar(
             }
         }
     }
+}
+
+private fun showToast(context: android.content.Context, message: String, longToast: Boolean = false) {
+    val toast = Toast(context)
+    val layout = LinearLayout(context).apply {
+        orientation = LinearLayout.HORIZONTAL
+        setPadding(48, 20, 48, 20)
+        val bg = GradientDrawable().apply {
+            setColor(0xDD333333.toInt())
+            cornerRadius = 32f
+        }
+        background = bg
+    }
+    val textView = TextView(context).apply {
+        setText(message)
+        setTextColor(android.graphics.Color.WHITE)
+        textSize = 14f
+        gravity = Gravity.CENTER
+    }
+    layout.addView(textView)
+    toast.view = layout
+    toast.duration = if (longToast) Toast.LENGTH_LONG else Toast.LENGTH_SHORT
+    toast.show()
 }

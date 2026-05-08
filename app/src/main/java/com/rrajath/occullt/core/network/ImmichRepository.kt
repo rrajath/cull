@@ -85,7 +85,7 @@ class ImmichRepository(
             Result.success(
                 PaginatedResult(
                     photos = photos,
-                    hasMore = searchResponse.hasNextPage || (createdBefore == null && photos.size >= 200),
+                    hasMore = photos.isNotEmpty(),
                     nextCreatedBefore = nextCreatedBefore,
                 )
             )
@@ -145,9 +145,7 @@ class ImmichRepository(
     }
 
     suspend fun deletePhotos(assetIds: List<String>): Result<Unit> {
-        val immichIds = assetIds.mapNotNull { id ->
-            if (id.startsWith("immich_")) id.removePrefix("immich_") else null
-        }
+        val immichIds = assetIds.filter { it.isNotBlank() }
 
         if (immichIds.isEmpty()) {
             return Result.success(Unit)

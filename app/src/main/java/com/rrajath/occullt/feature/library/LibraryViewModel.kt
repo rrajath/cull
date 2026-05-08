@@ -174,11 +174,18 @@ class LibraryViewModel(
             val unifiedRepo = UnifiedPhotoRepository(context, immichRepo)
             val currentPhotos = _state.value.photos.toMutableList()
 
+            val currentCreatedAfter = _state.value.createdAfter ?: return@launch
+
+            val calendar = Calendar.getInstance()
+            calendar.time = dateFormat.parse(currentCreatedAfter) ?: return@launch
+            calendar.add(Calendar.DAY_OF_YEAR, -7)
+            val newCreatedAfter = dateFormat.format(calendar.time)
+
             val result = unifiedRepo.loadPhotosPaginated(
                 sourceMode = sourceMode,
                 folderUri = folderUri,
-                createdAfter = _state.value.createdAfter,
-                createdBefore = _state.value.createdBefore,
+                createdAfter = newCreatedAfter,
+                createdBefore = currentCreatedAfter,
             )
 
             if (result.isSuccess) {
@@ -189,8 +196,9 @@ class LibraryViewModel(
                 _state.value = _state.value.copy(
                     photos = currentPhotos,
                     isLoadingMore = false,
-                    hasMore = paginated.hasMore,
-                    createdBefore = paginated.nextCreatedBefore,
+                    hasMore = paginated.photos.isNotEmpty(),
+                    createdAfter = newCreatedAfter,
+                    createdBefore = currentCreatedAfter,
                 )
             } else {
                 _state.value = _state.value.copy(

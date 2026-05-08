@@ -21,6 +21,8 @@ import com.rrajath.occullt.feature.library.LibraryScreen
 import com.rrajath.occullt.feature.settings.SettingsScreen
 import com.rrajath.occullt.feature.viewer.ViewerScreen
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
@@ -29,6 +31,13 @@ class SessionViewModel : androidx.lifecycle.ViewModel() {
     var lastFolderUri by mutableStateOf<String?>(null)
     var markedIds by mutableStateOf<Set<String>>(emptySet())
     var pinnedId by mutableStateOf<String?>(null)
+
+    private val _reloadTrigger = MutableStateFlow(0)
+    val reloadTrigger: StateFlow<Int> = _reloadTrigger.asStateFlow()
+
+    fun triggerReload() {
+        _reloadTrigger.value++
+    }
 
     fun saveSession(index: Int, folderUri: String?, settingsRepository: SettingsRepository) {
         viewModelScope.launch {
@@ -89,6 +98,7 @@ fun OcculltNavHost(
                 onPhotoClick = { index, folderUri ->
                     navController.navigate(Route.Viewer(photoIndex = index, folderUri = folderUri))
                 },
+                reloadTrigger = sessionViewModel.reloadTrigger,
                 settingsRepository = settingsRepository
             )
         }
@@ -104,6 +114,10 @@ fun OcculltNavHost(
                         viewerRoute.folderUri,
                         settingsRepository
                     )
+                    navController.popBackStack()
+                },
+                onDeleteCompleted = {
+                    sessionViewModel.triggerReload()
                     navController.popBackStack()
                 },
                 settingsRepository = settingsRepository

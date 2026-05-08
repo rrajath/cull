@@ -5,6 +5,7 @@ import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -16,7 +17,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
@@ -28,7 +28,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -53,12 +52,15 @@ import com.rrajath.occullt.ui.component.CircleIcon
 import com.rrajath.occullt.ui.component.SourceMode
 import com.rrajath.occullt.ui.icon.CullIcons
 import com.rrajath.occullt.ui.theme.LocalExtendedColorScheme
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.first
 
 @Composable
 fun LibraryScreen(
     onNavigateBack: () -> Unit,
     onPhotoClick: (Int, String?) -> Unit,
+    reloadTrigger: StateFlow<Int>,
     settingsRepository: SettingsRepository,
     modifier: Modifier = Modifier,
 ) {
@@ -98,6 +100,12 @@ fun LibraryScreen(
             } else {
                 permissionLauncher.launch(Manifest.permission.READ_MEDIA_IMAGES)
             }
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        reloadTrigger.collectLatest {
+            viewModel.loadPhotos(forceReload = true)
         }
     }
 
@@ -203,24 +211,8 @@ fun LibraryScreen(
                 )
             }
         } else {
-            val gridState = rememberLazyGridState()
-            val shouldLoadMore by remember {
-                derivedStateOf {
-                    val layoutInfo = gridState.layoutInfo
-                    val totalItems = layoutInfo.totalItemsCount
-                    val lastVisibleItem = layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
-                    totalItems > 0 && lastVisibleItem >= totalItems - 6
-                }
-            }
-
-            LaunchedEffect(shouldLoadMore) {
-                if (shouldLoadMore && state.hasMore && !state.isLoadingMore) {
-                    viewModel.loadMorePhotos()
-                }
-            }
-
             LazyVerticalGrid(
-                state = gridState,
+                state = rememberLazyGridState(),
                 columns = GridCells.Fixed(3),
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
                 verticalArrangement = Arrangement.spacedBy(6.dp),
@@ -313,19 +305,46 @@ fun LibraryScreen(
                     }
                 }
 
-                if (state.hasMore || state.isLoadingMore) {
+                if (state.hasMore) {
                     item {
                         Box(
                             modifier = Modifier
                                 .aspectRatio(0.75f)
-                                .fillMaxWidth(),
+                                .clip(RoundedCornerShape(14.dp))
+                                .background(colors.bgElev2)
+                                .border(1.dp, colors.line, RoundedCornerShape(14.dp))
+                                .clickable(enabled = !state.isLoadingMore) {
+                                    viewModel.loadMorePhotos()
+                                },
                             contentAlignment = Alignment.Center
                         ) {
-                            CircularProgressIndicator(
-                                color = colors.accent,
-                                modifier = Modifier.size(32.dp),
-                                strokeWidth = 2.dp
-                            )
+                            if (state.isLoadingMore) {
+                                CircularProgressIndicator(
+                                    color = colors.accent,
+                                    modifier = Modifier.size(24.dp),
+                                    strokeWidth = 2.dp
+                                )
+                            } else {
+                                Column(
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.spacedBy(2.dp)
+                                ) {
+                                    Text(
+                                        text = "Load",
+                                        style = com.rrajath.occullt.ui.theme.GiantButtonTitleStyle.copy(
+                                            color = colors.accent,
+                                            fontSize = 24.sp,
+                                        )
+                                    )
+                                    Text(
+                                        text = "More",
+                                        style = com.rrajath.occullt.ui.theme.GiantButtonTitleStyle.copy(
+                                            color = colors.accent,
+                                            fontSize = 24.sp,
+                                        )
+                                    )
+                                }
+                            }
                         }
                     }
                 }
