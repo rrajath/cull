@@ -21,7 +21,6 @@ import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -63,7 +62,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerInputChange
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
@@ -91,6 +89,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -111,6 +110,13 @@ fun ViewerScreen(
     var photos by remember { mutableStateOf<List<UnifiedPhotoItem>>(emptyList()) }
     var isLoadingPhotos by remember { mutableStateOf(true) }
     var immichApiKey by remember { mutableStateOf<String?>(null) }
+    var longPressThreshold by remember { mutableStateOf(220) }
+
+    LaunchedEffect(settingsRepository) {
+        settingsRepository.longPressThreshold.collectLatest { threshold ->
+            longPressThreshold = threshold
+        }
+    }
 
     LaunchedEffect(folderUri) {
         if (folderUri != null) {
@@ -283,6 +289,7 @@ fun ViewerScreen(
                 showPinnedBadge = isPinned || (state.isLongPressing && state.pinnedId == pinnedPhoto?.id),
                 sourceMode = photos.getOrNull(pagerState.currentPage)?.source ?: PhotoSource.Local,
                 immichApiKey = immichApiKey,
+                longPressThreshold = longPressThreshold,
                 onToggleHud = { viewModel.toggleHud() },
                 onLongPress = {
                     if (state.pinnedId == photo.id) {
@@ -506,6 +513,7 @@ private fun ViewerPhotoPage(
     onLoadingChanged: (Boolean) -> Unit,
     onMarkToggle: () -> Unit,
     onZoomStateChanged: (Boolean) -> Unit,
+    longPressThreshold: Int = 220,
 ) {
     val colors = ThemeColors.current
 
@@ -533,26 +541,30 @@ private fun ViewerPhotoPage(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .combinedClickable(
-                onClick = onToggleHud,
-                onLongClick = onLongPress,
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null,
-                hapticFeedbackEnabled = false
-            )
-            .pointerInput(isLongPressing) {
-                if (isLongPressing) {
-                    awaitPointerEventScope {
+            .pointerInput(longPressThreshold) {
+                awaitEachGesture {
+                    awaitFirstDown(requireUnconsumed = false)
+                    val released = withTimeoutOrNull(longPressThreshold.toLong()) {
+                        var event = awaitPointerEvent()
+                        while (event.changes.any { it.pressed }) {
+                            event = awaitPointerEvent()
+                        }
+                        true
+                    }
+                    if (released == true) {
+                        onToggleHud()
+                    } else {
+                        onLongPress()
                         while (true) {
-                            val event = awaitPointerEvent(PointerEventPass.Initial)
+                            val event = awaitPointerEvent()
                             if (event.changes.none { it.pressed }) {
                                 onLongPressRelease()
                                 break
+                            }
+                        }
+                    }
                 }
             }
-        }
-    }
-}
     ) {
         Box(
             modifier = Modifier
