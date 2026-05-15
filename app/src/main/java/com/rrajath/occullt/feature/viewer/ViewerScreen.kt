@@ -336,7 +336,6 @@ fun ViewerScreen(
                 markedCount = state.markedIds.size,
                 isPinned = isCurrentPinned,
                 isMarked = state.isMarked,
-                sourceMode = photos.getOrNull(pagerState.currentPage)?.source ?: PhotoSource.Local,
                 onTogglePin = {
                     val currentPhoto = photos.getOrNull(pagerState.currentPage)
                     if (currentPhoto != null) {
@@ -542,17 +541,25 @@ private fun ViewerPhotoPage(
         modifier = Modifier
             .fillMaxSize()
             .pointerInput(longPressThreshold) {
+                val touchSlop = viewConfiguration.touchSlop
                 awaitEachGesture {
-                    awaitFirstDown(requireUnconsumed = false)
+                    val down = awaitFirstDown(requireUnconsumed = false)
+                    val downPos = down.position
+                    var dragged = false
                     val released = withTimeoutOrNull(longPressThreshold.toLong()) {
                         var event = awaitPointerEvent()
                         while (event.changes.any { it.pressed }) {
+                            val change = event.changes.firstOrNull()
+                            if (change != null && (change.position - downPos).getDistance() > touchSlop) {
+                                dragged = true
+                            }
                             event = awaitPointerEvent()
                         }
                         true
                     }
-                    if (released == true) {
+                    if (released == true && !dragged) {
                         onToggleHud()
+                    } else if (released == true) {
                     } else {
                         onLongPress()
                         while (true) {
@@ -750,7 +757,6 @@ private fun HudPill(
     markedCount: Int,
     isPinned: Boolean,
     isMarked: Boolean,
-    sourceMode: PhotoSource,
     onTogglePin: () -> Unit,
     onToggleMark: () -> Unit,
     onConfirm: () -> Unit,
@@ -765,30 +771,6 @@ private fun HudPill(
             .padding(horizontal = 16.dp, vertical = 18.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Box(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(999.dp))
-                    .background(colors.bgElev.copy(alpha = 0.85f))
-                    .padding(horizontal = 12.dp, vertical = 6.dp)
-            ) {
-                Text(
-                    text = when (sourceMode) {
-                        PhotoSource.Local -> "Local only"
-                        PhotoSource.Immich -> "Immich"
-                    },
-                    style = androidx.compose.material3.MaterialTheme.typography.labelLarge.copy(
-                        color = colors.fgDim,
-                        fontSize = 11.sp
-                    )
-                )
-            }
-        }
-
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,

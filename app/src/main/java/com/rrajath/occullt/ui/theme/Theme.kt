@@ -46,7 +46,7 @@ private fun DarkExtendedColorScheme(accentIndex: Int) = ExtendedColorScheme(
     accentSoft = accentPalette(accentIndex).softDark,
     danger = Danger,
     dangerSoft = DangerSoft,
-    pin = Pin,
+    pin = accentPalette(accentIndex).color,
     scrim = DarkScrim,
 )
 
@@ -63,7 +63,7 @@ private fun LightExtendedColorScheme(accentIndex: Int) = ExtendedColorScheme(
     accentSoft = accentPalette(accentIndex).softLight,
     danger = Danger,
     dangerSoft = LightDangerSoft,
-    pin = Pin,
+    pin = accentPalette(accentIndex).color,
     scrim = LightScrim,
 )
 

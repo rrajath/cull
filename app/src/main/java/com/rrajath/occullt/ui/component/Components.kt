@@ -210,7 +210,7 @@ fun SourceSwitcher(
                     text = when (mode) {
                         SourceMode.Local -> "Local"
                         SourceMode.Immich -> "Immich"
-                        SourceMode.Hybrid -> "Local+Immich"
+                        SourceMode.Hybrid -> "Hybrid"
                     },
                     style = LabelStyle.copy(
                         color = if (isSelected) colors.accent else colors.fgDim,
