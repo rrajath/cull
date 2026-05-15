@@ -201,7 +201,7 @@ private fun CullMark(
 ) {
     val colors = ThemeColors.current
     Text(
-        text = "CullQwen",
+        text = "Cull",
         style = androidx.compose.material3.MaterialTheme.typography.headlineLarge.copy(
             color = colors.fg,
             fontStyle = FontStyle.Italic,
