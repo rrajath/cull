@@ -242,8 +242,8 @@ class ImmichApi(
     ): Result<Unit> = withContext(Dispatchers.IO) {
         try {
             val url = "$baseUrl/api/assets"
-            val idsJson = assetIds.joinToString(",", prefix = "[\"", postfix = "\"]")
-            val body = """{"ids":$idsJson,"force":$force}"""
+            val idsJson = assetIds.joinToString(",") { "\"$it\"" }
+            val body = """{"ids":[$idsJson],"force":$force}"""
             android.util.Log.d("ImmichApi", "deleteAssets url=$url body=$body ids=${assetIds.joinToString(",")}")
 
             val request = Request.Builder()
