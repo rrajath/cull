@@ -244,6 +244,7 @@ class ImmichApi(
             val url = "$baseUrl/api/assets"
             val idsJson = assetIds.joinToString(",", prefix = "[\"", postfix = "\"]")
             val body = """{"ids":$idsJson,"force":$force}"""
+            android.util.Log.d("ImmichApi", "deleteAssets url=$url body=$body ids=${assetIds.joinToString(",")}")
 
             val request = Request.Builder()
                 .url(url)
@@ -253,15 +254,19 @@ class ImmichApi(
                 .build()
 
             val response = client.newCall(request).execute()
+            val responseBody = response.body?.string()
+            android.util.Log.d("ImmichApi", "deleteAssets response code=${response.code} body=$responseBody")
 
             if (!response.isSuccessful) {
-                Result.failure(Exception("HTTP ${response.code}: ${response.message}"))
+                Result.failure(Exception("HTTP ${response.code}: $responseBody"))
             } else {
                 Result.success(Unit)
             }
         } catch (e: IOException) {
+            android.util.Log.e("ImmichApi", "deleteAssets network error", e)
             Result.failure(Exception("Network error: ${e.message ?: e.javaClass.simpleName}"))
         } catch (e: Exception) {
+            android.util.Log.e("ImmichApi", "deleteAssets error", e)
             Result.failure(Exception("Error: ${e.message ?: e.javaClass.simpleName}"))
         }
     }
