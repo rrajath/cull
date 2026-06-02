@@ -9,6 +9,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Cloud
 import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.FilterAlt
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.PhotoLibrary
@@ -34,5 +35,6 @@ object CullIcons {
     val X: ImageVector = Icons.Default.Close
     val Trash: ImageVector = Icons.Default.Delete
     val Check: ImageVector = Icons.Default.Check
+    val Filter: ImageVector = Icons.Default.FilterAlt
     val Stacks: ImageVector = Icons.Default.Layers
 }

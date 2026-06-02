@@ -23,6 +23,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Calendar
+import java.util.Date
 import java.util.Locale
 
 data class LibraryState(
@@ -37,7 +38,11 @@ data class LibraryState(
     val hasMore: Boolean = false,
     val createdAfter: String? = null,
     val createdBefore: String? = null,
-)
+    val filterStartDate: Long? = null,
+    val filterEndDate: Long? = null,
+) {
+    val isFilterActive: Boolean get() = filterStartDate != null || filterEndDate != null
+}
 
 class LibraryViewModel(
     private val context: Context,
@@ -94,29 +99,41 @@ class LibraryViewModel(
             }
 
             if (sourceMode == SourceMode.Immich || sourceMode == SourceMode.Hybrid) {
-                val sevenDaysAgo = Calendar.getInstance().apply {
-                    add(Calendar.DAY_OF_YEAR, -7)
-                }.time
-                val createdAfterStr = dateFormat.format(sevenDaysAgo)
+                val filterStartDateMs = _state.value.filterStartDate
+                val filterEndDateMs = _state.value.filterEndDate
+
+                val createdAfterStr = if (filterStartDateMs != null) {
+                    dateFormat.format(Date(filterStartDateMs))
+                } else {
+                    dateFormat.format(Calendar.getInstance().apply { add(Calendar.DAY_OF_YEAR, -7) }.time)
+                }
+                val createdBeforeStr = filterEndDateMs?.let { dateFormat.format(Date(it)) }
 
                 val result = unifiedRepo.loadPhotosPaginated(
                     sourceMode = sourceMode,
                     folderUri = folderUri,
                     createdAfter = createdAfterStr,
-                    createdBefore = null,
+                    createdBefore = createdBeforeStr,
                 )
 
                 if (result.isSuccess) {
                     val paginated = result.getOrThrow()
+                    var allPhotos = paginated.photos
+                    if (sourceMode == SourceMode.Hybrid) {
+                        allPhotos = allPhotos.filter { photo ->
+                            (filterStartDateMs == null || photo.dateModified >= filterStartDateMs) &&
+                            (filterEndDateMs == null || photo.dateModified <= filterEndDateMs)
+                        }
+                    }
                     hasLoadedPhotos = true
                     _state.value = _state.value.copy(
-                        photos = paginated.photos,
+                        photos = allPhotos,
                         isLoading = false,
                         folderUri = folderUri,
                         markedIds = markedIds,
                         pinnedId = pinnedId,
                         sourceMode = sourceMode,
-                        hasMore = paginated.hasMore,
+                        hasMore = if (_state.value.isFilterActive) false else paginated.hasMore,
                         createdAfter = createdAfterStr,
                         createdBefore = paginated.nextCreatedBefore,
                     )
@@ -130,10 +147,20 @@ class LibraryViewModel(
                 val result = unifiedRepo.loadPhotos(sourceMode, folderUri)
 
                 if (result.isSuccess) {
-                    val photos = result.getOrNull().orEmpty()
+                    val allPhotos = result.getOrNull().orEmpty()
+                    val filterStartDateMs = _state.value.filterStartDate
+                    val filterEndDateMs = _state.value.filterEndDate
+                    val filteredPhotos = if (_state.value.isFilterActive) {
+                        allPhotos.filter { photo ->
+                            (filterStartDateMs == null || photo.dateModified >= filterStartDateMs) &&
+                            (filterEndDateMs == null || photo.dateModified <= filterEndDateMs)
+                        }
+                    } else {
+                        allPhotos
+                    }
                     hasLoadedPhotos = true
                     _state.value = _state.value.copy(
-                        photos = photos,
+                        photos = filteredPhotos,
                         isLoading = false,
                         folderUri = folderUri,
                         markedIds = markedIds,
@@ -152,7 +179,7 @@ class LibraryViewModel(
     }
 
     fun loadMorePhotos() {
-        if (_state.value.isLoadingMore || !_state.value.hasMore) return
+        if (_state.value.isLoadingMore || !_state.value.hasMore || _state.value.isFilterActive) return
 
         viewModelScope.launch {
             _state.value = _state.value.copy(isLoadingMore = true)
@@ -231,6 +258,22 @@ class LibraryViewModel(
 
     fun clearError() {
         _state.value = _state.value.copy(error = null)
+    }
+
+    fun setDateFilter(startDate: Long?, endDate: Long?) {
+        _state.value = _state.value.copy(
+            filterStartDate = startDate,
+            filterEndDate = endDate,
+        )
+        loadPhotos(forceReload = true)
+    }
+
+    fun clearDateFilter() {
+        _state.value = _state.value.copy(
+            filterStartDate = null,
+            filterEndDate = null,
+        )
+        loadPhotos(forceReload = true)
     }
 }
 
