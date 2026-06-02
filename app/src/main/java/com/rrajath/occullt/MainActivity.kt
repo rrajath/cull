@@ -7,17 +7,13 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import com.rrajath.occullt.core.datastore.SettingsRepository
 import com.rrajath.occullt.navigation.OcculltNavHost
 import com.rrajath.occullt.ui.theme.CatppuccinAccents
 import com.rrajath.occullt.ui.theme.OcculltTheme
-import kotlinx.coroutines.flow.collectLatest
-import kotlinx.coroutines.runBlocking
+import androidx.compose.runtime.collectAsState
 
 class MainActivity : ComponentActivity() {
     private val settingsRepository by lazy { SettingsRepository(applicationContext) }
@@ -26,20 +22,9 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            var darkTheme by mutableStateOf(true)
-            var accentIndex by mutableStateOf(0)
-
-            LaunchedEffect(settingsRepository) {
-                settingsRepository.darkTheme.collectLatest { isDark ->
-                    darkTheme = isDark
-                }
-            }
-
-            LaunchedEffect(settingsRepository) {
-                settingsRepository.accentHue.collectLatest { hue ->
-                    accentIndex = if (hue in CatppuccinAccents.indices) hue else 0
-                }
-            }
+            val darkTheme by settingsRepository.darkTheme.collectAsState(initial = true)
+            val accentHue by settingsRepository.accentHue.collectAsState(initial = 0)
+            val accentIndex = if (accentHue in CatppuccinAccents.indices) accentHue else 0
 
             OcculltTheme(darkTheme = darkTheme, accentIndex = accentIndex) {
                 Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
