@@ -20,6 +20,7 @@ class ImmichRepository(
         val photos: List<UnifiedPhotoItem>,
         val hasMore: Boolean,
         val nextCreatedBefore: String?,
+        val hasNextPage: Boolean = false,
     )
 
     suspend fun searchPhotosByDateRange(
@@ -87,8 +88,9 @@ class ImmichRepository(
             Result.success(
                 PaginatedResult(
                     photos = photos,
-                    hasMore = searchResponse.hasNextPage,
+                    hasMore = photos.isNotEmpty(),
                     nextCreatedBefore = nextCreatedBefore,
+                    hasNextPage = searchResponse.hasNextPage,
                 )
             )
         } catch (e: Exception) {

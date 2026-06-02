@@ -142,8 +142,8 @@ class LibraryViewModel(
                         markedIds = markedIds,
                         pinnedId = pinnedId,
                         sourceMode = sourceMode,
-                        hasMore = paginated.hasMore,
-                        createdAfter = if (isFiltered) createdAfterStr else createdAfterStr,
+                        hasMore = if (isFiltered) paginated.hasNextPage else paginated.hasMore,
+                        createdAfter = createdAfterStr,
                         createdBefore = paginated.nextCreatedBefore,
                         filterPage = 1,
                     )
@@ -246,7 +246,7 @@ class LibraryViewModel(
                     _state.value = _state.value.copy(
                         photos = currentPhotos,
                         isLoadingMore = false,
-                        hasMore = paginated.hasMore,
+                        hasMore = paginated.hasNextPage,
                         filterPage = nextPage,
                     )
                 } else {

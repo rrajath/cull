@@ -20,6 +20,7 @@ class UnifiedPhotoRepository(
         val photos: List<UnifiedPhotoItem>,
         val hasMore: Boolean,
         val nextCreatedBefore: String?,
+        val hasNextPage: Boolean = false,
     )
 
     data class DeleteSummary(
@@ -88,6 +89,7 @@ class UnifiedPhotoRepository(
         try {
             var immichHasMore = false
             var immichNextCreatedBefore: String? = null
+            var immichHasNextPage = false
 
             val immichPhotos = if ((sourceMode == SourceMode.Immich || sourceMode == SourceMode.Hybrid) && immichRepository != null) {
                 if (createdAfter == null) {
@@ -104,6 +106,7 @@ class UnifiedPhotoRepository(
                     val paginated = result.getOrNull()
                     immichHasMore = paginated?.hasMore ?: false
                     immichNextCreatedBefore = paginated?.nextCreatedBefore
+                    immichHasNextPage = paginated?.hasNextPage ?: false
                     paginated?.photos.orEmpty()
                 } else {
                     val result = immichRepository.searchPhotosByDateRange(
@@ -115,6 +118,7 @@ class UnifiedPhotoRepository(
                     val paginated = result.getOrNull()
                     immichHasMore = paginated?.hasMore ?: false
                     immichNextCreatedBefore = paginated?.nextCreatedBefore
+                    immichHasNextPage = paginated?.hasNextPage ?: false
                     paginated?.photos.orEmpty()
                 }
             } else {
@@ -127,6 +131,7 @@ class UnifiedPhotoRepository(
                         photos = immichPhotos,
                         hasMore = immichHasMore,
                         nextCreatedBefore = immichNextCreatedBefore,
+                        hasNextPage = immichHasNextPage,
                     )
                 )
             }
@@ -155,6 +160,7 @@ class UnifiedPhotoRepository(
                     photos = hybridPhotos,
                     hasMore = immichHasMore,
                     nextCreatedBefore = immichNextCreatedBefore,
+                    hasNextPage = immichHasNextPage,
                 )
             )
         } catch (e: Exception) {

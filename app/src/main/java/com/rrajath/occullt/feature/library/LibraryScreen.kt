@@ -629,7 +629,12 @@ fun LibraryScreen(
                 }
             }
         ) {
-            DatePicker(state = datePickerState, title = {}, headline = {})
+            DatePicker(
+                state = datePickerState,
+                title = null,
+                headline = null,
+                showModeToggle = false,
+            )
         }
     }
 
@@ -653,7 +658,12 @@ fun LibraryScreen(
                 }
             }
         ) {
-            DatePicker(state = datePickerState, title = {}, headline = {})
+            DatePicker(
+                state = datePickerState,
+                title = null,
+                headline = null,
+                showModeToggle = false,
+            )
         }
     }
 }
