@@ -17,4 +17,10 @@ sealed interface Route {
 
     @Serializable
     data object Settings : Route
+
+    @Serializable
+    data object Stacks : Route
+
+    @Serializable
+    data class StackGrid(val stackIndex: Int) : Route
 }

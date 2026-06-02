@@ -60,6 +60,7 @@ import kotlinx.coroutines.flow.first
 fun LibraryScreen(
     onNavigateBack: () -> Unit,
     onPhotoClick: (Int, String?) -> Unit,
+    onNavigateToStacks: () -> Unit,
     reloadTrigger: StateFlow<Int>,
     settingsRepository: SettingsRepository,
     modifier: Modifier = Modifier,
@@ -118,48 +119,67 @@ fun LibraryScreen(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp, vertical = 12.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                CircleIcon(
+                    onClick = onNavigateBack,
+                    icon = {
+                        Icon(
+                            imageVector = CullIcons.Arrow,
+                            contentDescription = "Back",
+                            tint = colors.fg,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                )
+                Column {
+                    Text(
+                        text = "Library",
+                        style = androidx.compose.material3.MaterialTheme.typography.titleLarge.copy(
+                            color = colors.fg,
+                            fontSize = 28.sp
+                        )
+                    )
+                    val subtitle = when {
+                        state.isLoading -> "Loading..."
+                        state.error != null -> state.error!!
+                        else -> {
+                            val sourceLabel = when (state.sourceMode) {
+                                SourceMode.Local -> "Local"
+                                SourceMode.Immich -> "Immich"
+                                SourceMode.Hybrid -> "Hybrid"
+                            }
+                            "${state.photos.size} photos · $sourceLabel"
+                        }
+                    }
+                    Text(
+                        text = subtitle,
+                        style = androidx.compose.material3.MaterialTheme.typography.labelLarge.copy(
+                            color = colors.fgDim,
+                            fontSize = 12.sp
+                        )
+                    )
+                }
+            }
             CircleIcon(
-                onClick = onNavigateBack,
+                onClick = {
+                    PhotoCache.setPhotos(state.photos)
+                    onNavigateToStacks()
+                },
                 icon = {
                     Icon(
-                        imageVector = CullIcons.Arrow,
-                        contentDescription = "Back",
+                        imageVector = CullIcons.Stacks,
+                        contentDescription = "Photo stacks",
                         tint = colors.fg,
                         modifier = Modifier.size(20.dp)
                     )
                 }
             )
-            Column {
-                Text(
-                    text = "Library",
-                    style = androidx.compose.material3.MaterialTheme.typography.titleLarge.copy(
-                        color = colors.fg,
-                        fontSize = 28.sp
-                    )
-                )
-                val subtitle = when {
-                    state.isLoading -> "Loading..."
-                    state.error != null -> state.error!!
-                    else -> {
-                        val sourceLabel = when (state.sourceMode) {
-                            SourceMode.Local -> "Local"
-                            SourceMode.Immich -> "Immich"
-                            SourceMode.Hybrid -> "Hybrid"
-                        }
-                        "${state.photos.size} photos · $sourceLabel"
-                    }
-                }
-                Text(
-                    text = subtitle,
-                    style = androidx.compose.material3.MaterialTheme.typography.labelLarge.copy(
-                        color = colors.fgDim,
-                        fontSize = 12.sp
-                    )
-                )
-            }
         }
 
         if (state.isLoading) {

@@ -32,6 +32,7 @@ class SettingsRepository(context: Context) {
         val LAST_FOLDER_URI = stringPreferencesKey("last_folder_uri")
         val MARKED_IDS = stringPreferencesKey("marked_ids")
         val PINNED_ID = stringPreferencesKey("pinned_id")
+        val GROUPING_WINDOW_MINUTES = intPreferencesKey("grouping_window_minutes")
     }
 
     val sourceMode: Flow<SourceMode> = dataStore.data.map { prefs ->
@@ -87,6 +88,10 @@ class SettingsRepository(context: Context) {
 
     val pinnedId: Flow<String?> = dataStore.data.map { prefs ->
         prefs[Keys.PINNED_ID]
+    }
+
+    val groupingWindowMinutes: Flow<Int> = dataStore.data.map { prefs ->
+        prefs[Keys.GROUPING_WINDOW_MINUTES] ?: 2
     }
 
     suspend fun setSourceMode(mode: SourceMode) {
@@ -163,6 +168,12 @@ class SettingsRepository(context: Context) {
             } else {
                 prefs.remove(Keys.PINNED_ID)
             }
+        }
+    }
+
+    suspend fun setGroupingWindowMinutes(minutes: Int) {
+        dataStore.edit { prefs ->
+            prefs[Keys.GROUPING_WINDOW_MINUTES] = minutes
         }
     }
 }

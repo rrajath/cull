@@ -19,6 +19,8 @@ import com.rrajath.occullt.core.datastore.SettingsRepository
 import com.rrajath.occullt.feature.home.HomeScreen
 import com.rrajath.occullt.feature.library.LibraryScreen
 import com.rrajath.occullt.feature.settings.SettingsScreen
+import com.rrajath.occullt.feature.stacks.StackGridScreen
+import com.rrajath.occullt.feature.stacks.StacksScreen
 import com.rrajath.occullt.feature.viewer.ViewerScreen
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -98,7 +100,36 @@ fun OcculltNavHost(
                 onPhotoClick = { index, folderUri ->
                     navController.navigate(Route.Viewer(photoIndex = index, folderUri = folderUri))
                 },
+                onNavigateToStacks = {
+                    navController.navigate(Route.Stacks)
+                },
                 reloadTrigger = sessionViewModel.reloadTrigger,
+                settingsRepository = settingsRepository
+            )
+        }
+
+        composable<Route.Stacks> {
+            StacksScreen(
+                onNavigateBack = {
+                    navController.popBackStack()
+                },
+                onStackClick = { stackIndex ->
+                    navController.navigate(Route.StackGrid(stackIndex = stackIndex))
+                },
+                settingsRepository = settingsRepository
+            )
+        }
+
+        composable<Route.StackGrid> { backStackEntry ->
+            val stackGridRoute = backStackEntry.toRoute<Route.StackGrid>()
+            StackGridScreen(
+                stackIndex = stackGridRoute.stackIndex,
+                onNavigateBack = {
+                    navController.popBackStack()
+                },
+                onPhotoClick = { index, folderUri ->
+                    navController.navigate(Route.Viewer(photoIndex = index, folderUri = folderUri))
+                },
                 settingsRepository = settingsRepository
             )
         }

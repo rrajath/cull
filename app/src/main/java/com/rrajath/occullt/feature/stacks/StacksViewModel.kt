@@ -1,0 +1,114 @@
+package com.rrajath.occullt.feature.stacks
+
+import android.content.Context
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.viewModelScope
+import com.rrajath.occullt.core.datastore.PhotoCache
+import com.rrajath.occullt.core.datastore.SettingsRepository
+import com.rrajath.occullt.core.model.UnifiedPhotoItem
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
+
+data class PhotoStack(
+    val photos: List<UnifiedPhotoItem>,
+    val startTime: Long,
+    val endTime: Long,
+)
+
+data class StacksState(
+    val groups: List<PhotoStack> = emptyList(),
+    val isLoading: Boolean = true,
+    val isEmpty: Boolean = false,
+)
+
+object PhotoStackCache {
+    var stacks: Map<Int, List<UnifiedPhotoItem>> = emptyMap()
+}
+
+class StacksViewModel(
+    private val context: Context,
+    private val settingsRepository: SettingsRepository,
+) : ViewModel() {
+
+    private val _state = MutableStateFlow(StacksState())
+    val state: StateFlow<StacksState> = _state.asStateFlow()
+
+    fun loadGroups() {
+        viewModelScope.launch {
+            _state.value = StacksState(isLoading = true)
+
+            val windowMinutes = settingsRepository.groupingWindowMinutes.first()
+            val windowMs = windowMinutes * 60 * 1000L
+
+            val photos = PhotoCache.getPhotos() ?: emptyList()
+            if (photos.isEmpty()) {
+                _state.value = StacksState(isLoading = false, isEmpty = true)
+                return@launch
+            }
+
+            val sorted = photos.sortedBy { it.dateModified }
+            val groups = groupPhotos(sorted, windowMs)
+
+            PhotoStackCache.stacks = groups.mapIndexed { index, stack ->
+                index to stack.photos
+            }.toMap()
+
+            _state.value = StacksState(
+                groups = groups,
+                isLoading = false,
+                isEmpty = groups.isEmpty(),
+            )
+        }
+    }
+
+    private fun groupPhotos(
+        photos: List<UnifiedPhotoItem>,
+        windowMs: Long,
+    ): List<PhotoStack> {
+        if (photos.size < 2) return emptyList()
+
+        val groups = mutableListOf<MutableList<UnifiedPhotoItem>>()
+        var currentGroup = mutableListOf(photos[0])
+
+        for (i in 1 until photos.size) {
+            val diff = photos[i].dateModified - photos[i - 1].dateModified
+            if (diff <= windowMs) {
+                currentGroup.add(photos[i])
+            } else {
+                if (currentGroup.size >= 2) {
+                    groups.add(currentGroup)
+                }
+                currentGroup = mutableListOf(photos[i])
+            }
+        }
+
+        if (currentGroup.size >= 2) {
+            groups.add(currentGroup)
+        }
+
+        return groups.reversed().map { group ->
+            PhotoStack(
+                photos = group,
+                startTime = group.first().dateModified,
+                endTime = group.last().dateModified,
+            )
+        }
+    }
+}
+
+class StacksViewModelFactory(
+    private val context: Context,
+    private val settingsRepository: SettingsRepository,
+) : ViewModelProvider.Factory {
+    @Suppress("UNCHECKED_CAST")
+    override fun <T : ViewModel> create(modelClass: Class<T>): T {
+        if (modelClass.isAssignableFrom(StacksViewModel::class.java)) {
+            return StacksViewModel(context, settingsRepository) as T
+        }
+        throw IllegalArgumentException("Unknown ViewModel class")
+    }
+}

@@ -81,6 +81,7 @@ fun SettingsScreen(
     var mirrorDeletes by remember { mutableStateOf(false) }
     var darkTheme by remember { mutableStateOf(true) }
     var accentHue by remember { mutableStateOf(0) }
+    var groupingWindowMinutes by remember { mutableStateOf(2) }
     var connectionState by remember { mutableStateOf<ConnectionState>(ConnectionState.NotTested) }
     var isTesting by remember { mutableStateOf(false) }
 
@@ -128,6 +129,11 @@ fun SettingsScreen(
         launch {
             settingsRepository.accentHue.collectLatest { hue ->
                 accentHue = hue
+            }
+        }
+        launch {
+            settingsRepository.groupingWindowMinutes.collectLatest { minutes ->
+                groupingWindowMinutes = minutes
             }
         }
     }
@@ -427,6 +433,18 @@ fun SettingsScreen(
                                 settingsRepository.setDryRun(newValue)
                             }
                         }
+                    )
+                    SliderRow(
+                        label = "Grouping window",
+                        value = groupingWindowMinutes,
+                        valueSuffix = "min",
+                        onValueChange = { newValue ->
+                            groupingWindowMinutes = newValue
+                            scope.launch {
+                                settingsRepository.setGroupingWindowMinutes(newValue)
+                            }
+                        },
+                        valueRange = 1f..30f,
                     )
                     if (sourceMode == SourceMode.Hybrid) {
                         ToggleRow(

@@ -13,6 +13,7 @@ import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.PushPin
+import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.ZoomOutMap
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -33,4 +34,5 @@ object CullIcons {
     val X: ImageVector = Icons.Default.Close
     val Trash: ImageVector = Icons.Default.Delete
     val Check: ImageVector = Icons.Default.Check
+    val Stacks: ImageVector = Icons.Default.Layers
 }
