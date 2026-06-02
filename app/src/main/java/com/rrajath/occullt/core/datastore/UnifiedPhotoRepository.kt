@@ -82,6 +82,8 @@ class UnifiedPhotoRepository(
         folderUri: String? = null,
         createdAfter: String? = null,
         createdBefore: String? = null,
+        page: Int = 1,
+        size: Int = 200,
     ): Result<PaginatedResult> = withContext(Dispatchers.IO) {
         try {
             var immichHasMore = false
@@ -96,6 +98,8 @@ class UnifiedPhotoRepository(
                     val result = immichRepository.searchPhotosByDateRange(
                         createdAfter = createdAfterStr,
                         createdBefore = createdBefore,
+                        page = page,
+                        size = size,
                     )
                     val paginated = result.getOrNull()
                     immichHasMore = paginated?.hasMore ?: false
@@ -105,6 +109,8 @@ class UnifiedPhotoRepository(
                     val result = immichRepository.searchPhotosByDateRange(
                         createdAfter = createdAfter,
                         createdBefore = createdBefore,
+                        page = page,
+                        size = size,
                     )
                     val paginated = result.getOrNull()
                     immichHasMore = paginated?.hasMore ?: false

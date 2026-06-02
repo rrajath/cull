@@ -25,13 +25,15 @@ class ImmichRepository(
     suspend fun searchPhotosByDateRange(
         createdAfter: String,
         createdBefore: String? = null,
+        page: Int = 1,
+        size: Int = 200,
     ): Result<PaginatedResult> = withContext(Dispatchers.IO) {
         try {
             val result = immichApi.searchMetadata(
                 createdAfter = createdAfter,
                 createdBefore = createdBefore,
-                page = 1,
-                size = 200,
+                page = page,
+                size = size,
             )
 
             if (result.isFailure) {
@@ -85,7 +87,7 @@ class ImmichRepository(
             Result.success(
                 PaginatedResult(
                     photos = photos,
-                    hasMore = photos.isNotEmpty(),
+                    hasMore = searchResponse.hasNextPage,
                     nextCreatedBefore = nextCreatedBefore,
                 )
             )

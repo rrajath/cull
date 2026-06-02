@@ -25,6 +25,7 @@ import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
+import java.util.TimeZone
 
 data class LibraryState(
     val photos: List<UnifiedPhotoItem> = emptyList(),
@@ -40,6 +41,7 @@ data class LibraryState(
     val createdBefore: String? = null,
     val filterStartDate: Long? = null,
     val filterEndDate: Long? = null,
+    val filterPage: Int = 1,
 ) {
     val isFilterActive: Boolean get() = filterStartDate != null || filterEndDate != null
 }
@@ -50,6 +52,9 @@ class LibraryViewModel(
 ) : ViewModel() {
 
     private val dateFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US)
+    private val utcDateFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US).apply {
+        timeZone = TimeZone.getTimeZone("UTC")
+    }
 
     private val _state = MutableStateFlow(LibraryState())
     val state: StateFlow<LibraryState> = _state.asStateFlow()
@@ -101,19 +106,23 @@ class LibraryViewModel(
             if (sourceMode == SourceMode.Immich || sourceMode == SourceMode.Hybrid) {
                 val filterStartDateMs = _state.value.filterStartDate
                 val filterEndDateMs = _state.value.filterEndDate
+                val isFiltered = _state.value.isFilterActive
 
                 val createdAfterStr = if (filterStartDateMs != null) {
-                    dateFormat.format(Date(filterStartDateMs))
+                    utcDateFormat.format(Date(filterStartDateMs))
                 } else {
                     dateFormat.format(Calendar.getInstance().apply { add(Calendar.DAY_OF_YEAR, -7) }.time)
                 }
-                val createdBeforeStr = filterEndDateMs?.let { dateFormat.format(Date(it)) }
+                val createdBeforeStr = filterEndDateMs?.let { utcDateFormat.format(Date(it)) }
 
+                val pageSize = if (isFiltered) 1000 else 200
                 val result = unifiedRepo.loadPhotosPaginated(
                     sourceMode = sourceMode,
                     folderUri = folderUri,
                     createdAfter = createdAfterStr,
                     createdBefore = createdBeforeStr,
+                    page = 1,
+                    size = pageSize,
                 )
 
                 if (result.isSuccess) {
@@ -133,9 +142,10 @@ class LibraryViewModel(
                         markedIds = markedIds,
                         pinnedId = pinnedId,
                         sourceMode = sourceMode,
-                        hasMore = if (_state.value.isFilterActive) false else paginated.hasMore,
-                        createdAfter = createdAfterStr,
+                        hasMore = paginated.hasMore,
+                        createdAfter = if (isFiltered) createdAfterStr else createdAfterStr,
                         createdBefore = paginated.nextCreatedBefore,
+                        filterPage = 1,
                     )
                 } else {
                     _state.value = _state.value.copy(
@@ -179,7 +189,7 @@ class LibraryViewModel(
     }
 
     fun loadMorePhotos() {
-        if (_state.value.isLoadingMore || !_state.value.hasMore || _state.value.isFilterActive) return
+        if (_state.value.isLoadingMore || !_state.value.hasMore) return
 
         viewModelScope.launch {
             _state.value = _state.value.copy(isLoadingMore = true)
@@ -201,37 +211,83 @@ class LibraryViewModel(
             val unifiedRepo = UnifiedPhotoRepository(context, immichRepo)
             val currentPhotos = _state.value.photos.toMutableList()
 
-            val currentCreatedAfter = _state.value.createdAfter ?: return@launch
+            if (_state.value.isFilterActive) {
+                val nextPage = _state.value.filterPage + 1
+                val filterStartDateMs = _state.value.filterStartDate
+                val filterEndDateMs = _state.value.filterEndDate
+                val createdAfterStr = if (filterStartDateMs != null) {
+                    utcDateFormat.format(Date(filterStartDateMs))
+                } else {
+                    return@launch
+                }
+                val createdBeforeStr = filterEndDateMs?.let { utcDateFormat.format(Date(it)) }
 
-            val calendar = Calendar.getInstance()
-            calendar.time = dateFormat.parse(currentCreatedAfter) ?: return@launch
-            calendar.add(Calendar.DAY_OF_YEAR, -7)
-            val newCreatedAfter = dateFormat.format(calendar.time)
+                val result = unifiedRepo.loadPhotosPaginated(
+                    sourceMode = sourceMode,
+                    folderUri = folderUri,
+                    createdAfter = createdAfterStr,
+                    createdBefore = createdBeforeStr,
+                    page = nextPage,
+                    size = 1000,
+                )
 
-            val result = unifiedRepo.loadPhotosPaginated(
-                sourceMode = sourceMode,
-                folderUri = folderUri,
-                createdAfter = newCreatedAfter,
-                createdBefore = currentCreatedAfter,
-            )
+                if (result.isSuccess) {
+                    val paginated = result.getOrThrow()
+                    var newPhotos = paginated.photos
+                    if (sourceMode == SourceMode.Hybrid) {
+                        newPhotos = newPhotos.filter { photo ->
+                            photo.dateModified >= filterStartDateMs &&
+                            (filterEndDateMs == null || photo.dateModified <= filterEndDateMs)
+                        }
+                    }
+                    currentPhotos.addAll(newPhotos)
+                    currentPhotos.sortByDescending { it.dateModified }
 
-            if (result.isSuccess) {
-                val paginated = result.getOrThrow()
-                currentPhotos.addAll(paginated.photos)
-                currentPhotos.sortByDescending { it.dateModified }
+                    _state.value = _state.value.copy(
+                        photos = currentPhotos,
+                        isLoadingMore = false,
+                        hasMore = paginated.hasMore,
+                        filterPage = nextPage,
+                    )
+                } else {
+                    _state.value = _state.value.copy(
+                        isLoadingMore = false,
+                        error = result.exceptionOrNull()?.message ?: "Failed to load more photos"
+                    )
+                }
+            } else {
+                val currentCreatedAfter = _state.value.createdAfter ?: return@launch
 
-                _state.value = _state.value.copy(
-                    photos = currentPhotos,
-                    isLoadingMore = false,
-                    hasMore = paginated.photos.isNotEmpty(),
+                val calendar = Calendar.getInstance()
+                calendar.time = dateFormat.parse(currentCreatedAfter) ?: return@launch
+                calendar.add(Calendar.DAY_OF_YEAR, -7)
+                val newCreatedAfter = dateFormat.format(calendar.time)
+
+                val result = unifiedRepo.loadPhotosPaginated(
+                    sourceMode = sourceMode,
+                    folderUri = folderUri,
                     createdAfter = newCreatedAfter,
                     createdBefore = currentCreatedAfter,
                 )
-            } else {
-                _state.value = _state.value.copy(
-                    isLoadingMore = false,
-                    error = result.exceptionOrNull()?.message ?: "Failed to load more photos"
-                )
+
+                if (result.isSuccess) {
+                    val paginated = result.getOrThrow()
+                    currentPhotos.addAll(paginated.photos)
+                    currentPhotos.sortByDescending { it.dateModified }
+
+                    _state.value = _state.value.copy(
+                        photos = currentPhotos,
+                        isLoadingMore = false,
+                        hasMore = paginated.photos.isNotEmpty(),
+                        createdAfter = newCreatedAfter,
+                        createdBefore = currentCreatedAfter,
+                    )
+                } else {
+                    _state.value = _state.value.copy(
+                        isLoadingMore = false,
+                        error = result.exceptionOrNull()?.message ?: "Failed to load more photos"
+                    )
+                }
             }
         }
     }

@@ -449,7 +449,9 @@ fun LibraryScreen(
     if (showFilterSheet) {
         val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
         val scope = rememberCoroutineScope()
-        val displayDateFormat = SimpleDateFormat("MMM d, yyyy", Locale.US)
+        val displayDateFormat = SimpleDateFormat("MMM d, yyyy", Locale.US).apply {
+            timeZone = java.util.TimeZone.getTimeZone("UTC")
+        }
 
         ModalBottomSheet(
             onDismissRequest = { showFilterSheet = false },
@@ -627,7 +629,7 @@ fun LibraryScreen(
                 }
             }
         ) {
-            DatePicker(state = datePickerState)
+            DatePicker(state = datePickerState, title = {}, headline = {})
         }
     }
 
@@ -651,7 +653,7 @@ fun LibraryScreen(
                 }
             }
         ) {
-            DatePicker(state = datePickerState)
+            DatePicker(state = datePickerState, title = {}, headline = {})
         }
     }
 }
