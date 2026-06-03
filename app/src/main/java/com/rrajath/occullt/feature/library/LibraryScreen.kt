@@ -133,7 +133,12 @@ fun LibraryScreen(
     }
 
     LaunchedEffect(Unit) {
+        var isFirst = true
         reloadTrigger.collectLatest {
+            if (isFirst) {
+                isFirst = false
+                return@collectLatest
+            }
             viewModel.loadPhotos(forceReload = true)
         }
     }
