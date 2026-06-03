@@ -37,6 +37,8 @@ class StacksViewModel(
     private val _state = MutableStateFlow(StacksState())
     val state: StateFlow<StacksState> = _state.asStateFlow()
 
+    private var cachedPhotos: List<UnifiedPhotoItem>? = null
+
     fun loadGroups() {
         viewModelScope.launch {
             _state.value = StacksState(isLoading = true)
@@ -44,7 +46,10 @@ class StacksViewModel(
             val windowMinutes = settingsRepository.groupingWindowMinutes.first()
             val windowMs = windowMinutes * 60 * 1000L
 
-            val photos = PhotoCache.getPhotos() ?: emptyList()
+            if (cachedPhotos == null) {
+                cachedPhotos = PhotoCache.getPhotos()
+            }
+            val photos = cachedPhotos ?: emptyList()
             if (photos.isEmpty()) {
                 _state.value = StacksState(isLoading = false, isEmpty = true)
                 return@launch
