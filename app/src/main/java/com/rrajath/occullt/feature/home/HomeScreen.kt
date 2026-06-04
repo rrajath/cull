@@ -148,7 +148,7 @@ fun HomeScreen(
                 }
             )
 
-            Spacer(modifier = Modifier.weight(1f))
+            Spacer(modifier = Modifier.height(32.dp))
 
             if (hasSession) {
                 ContinuePill(
@@ -170,7 +170,7 @@ fun HomeScreen(
             Spacer(modifier = Modifier.height(12.dp))
 
             GiantButton(
-                title = "Albums",
+                title = "Wizard",
                 subtitle = "Coming soon",
                 onClick = {},
                 accentBackground = false,
