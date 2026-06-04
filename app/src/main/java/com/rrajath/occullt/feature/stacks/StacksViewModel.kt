@@ -81,7 +81,7 @@ class StacksViewModel(
         var currentGroup = mutableListOf(photos[0])
 
         for (i in 1 until photos.size) {
-            val diff = photos[i].dateModified - photos[i - 1].dateModified
+            val diff = photos[i].dateModified - currentGroup.first().dateModified
             if (diff <= windowMs) {
                 currentGroup.add(photos[i])
             } else {
