@@ -10,7 +10,7 @@ import com.rrajath.occullt.core.model.UnifiedPhotoItem
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
 data class PhotoStack(
@@ -41,32 +41,33 @@ class StacksViewModel(
 
     fun loadGroups() {
         viewModelScope.launch {
-            _state.value = StacksState(isLoading = true)
+            settingsRepository.groupingWindowMinutes.collectLatest { windowMinutes ->
+                _state.value = StacksState(isLoading = true)
 
-            val windowMinutes = settingsRepository.groupingWindowMinutes.first()
-            val windowMs = windowMinutes * 60 * 1000L
+                val windowMs = windowMinutes * 60 * 1000L
 
-            if (cachedPhotos == null) {
-                cachedPhotos = PhotoCache.getPhotos()
+                if (cachedPhotos == null) {
+                    cachedPhotos = PhotoCache.getPhotos()
+                }
+                val photos = cachedPhotos ?: emptyList()
+                if (photos.isEmpty()) {
+                    _state.value = StacksState(isLoading = false, isEmpty = true)
+                    return@collectLatest
+                }
+
+                val sorted = photos.sortedBy { it.dateModified }
+                val groups = groupPhotos(sorted, windowMs)
+
+                PhotoStackCache.stacks = groups.mapIndexed { index, stack ->
+                    index to stack.photos
+                }.toMap()
+
+                _state.value = StacksState(
+                    groups = groups,
+                    isLoading = false,
+                    isEmpty = groups.isEmpty(),
+                )
             }
-            val photos = cachedPhotos ?: emptyList()
-            if (photos.isEmpty()) {
-                _state.value = StacksState(isLoading = false, isEmpty = true)
-                return@launch
-            }
-
-            val sorted = photos.sortedBy { it.dateModified }
-            val groups = groupPhotos(sorted, windowMs)
-
-            PhotoStackCache.stacks = groups.mapIndexed { index, stack ->
-                index to stack.photos
-            }.toMap()
-
-            _state.value = StacksState(
-                groups = groups,
-                isLoading = false,
-                isEmpty = groups.isEmpty(),
-            )
         }
     }
 
