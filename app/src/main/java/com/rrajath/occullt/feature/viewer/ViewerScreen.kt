@@ -10,6 +10,7 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -56,19 +57,24 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerInputChange
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
+import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlin.math.abs
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
@@ -253,20 +259,121 @@ fun ViewerScreen(
         }
     }
 
-    Box(
-        modifier = modifier
-            .fillMaxSize()
-            .background(Color.Black)
-    ) {
     var isCurrentPageZoomed by remember { mutableStateOf(false) }
 
     LaunchedEffect(pagerState.currentPage) {
         isCurrentPageZoomed = false
     }
 
+    // Google-Photos-style vertical gestures: drag down to dismiss the viewer,
+    // flick up to toggle the deletion mark. The drag is claimed only for a
+    // mostly-vertical single-finger movement on an unzoomed photo, so the
+    // pager's horizontal swipes, pinch zoom, and long-press compare are untouched.
+    val dismissOffsetY = remember { Animatable(0f) }
+    val density = LocalDensity.current
+    val dismissDistancePx = with(density) { 140.dp.toPx() }
+    val markDistancePx = with(density) { 110.dp.toPx() }
+    val flingVelocityPx = with(density) { 800.dp.toPx() }
+
+    val toggleMarkBySwipe: () -> Unit = {
+        val photo = photos.getOrNull(pagerState.currentPage)
+        if (photo != null) {
+            viewModel.toggleMarked(photo.id)
+            scope.launch {
+                settingsRepository.setMarkedIds(viewModel.state.value.markedIds)
+            }
+        }
+    }
+
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .drawBehind {
+                val progress = (dismissOffsetY.value / (size.height * 0.6f)).coerceIn(0f, 1f)
+                drawRect(Color.Black.copy(alpha = 1f - 0.5f * progress))
+            }
+            .pointerInput(Unit) {
+                val touchSlop = viewConfiguration.touchSlop
+                awaitEachGesture {
+                    val down = awaitFirstDown(requireUnconsumed = false)
+                    val velocityTracker = VelocityTracker()
+                    velocityTracker.addPosition(down.uptimeMillis, down.position)
+                    var dx = 0f
+                    var dy = 0f
+                    var claimed = false
+                    var cancelled = false
+                    while (true) {
+                        // Observe after the children (Main pass) until the drag is
+                        // ours, then intercept in the Initial pass so the pager and
+                        // zoom handlers no longer see it
+                        val event = awaitPointerEvent(
+                            if (claimed) PointerEventPass.Initial else PointerEventPass.Main
+                        )
+                        val pressed = event.changes.filter { it.pressed }
+                        if (pressed.isEmpty()) break
+                        if (pressed.size > 1) {
+                            cancelled = true
+                            break
+                        }
+                        val change = pressed.first()
+                        if (!claimed && (change.isConsumed || isCurrentPageZoomed || state.isLongPressing)) {
+                            cancelled = true
+                            break
+                        }
+                        velocityTracker.addPosition(change.uptimeMillis, change.position)
+                        val delta = change.positionChange()
+                        dx += delta.x
+                        dy += delta.y
+                        if (!claimed) {
+                            if (abs(dx) > touchSlop && abs(dx) >= abs(dy)) {
+                                // horizontal — the pager's
+                                cancelled = true
+                                break
+                            }
+                            if (abs(dy) > touchSlop && abs(dy) > abs(dx)) {
+                                claimed = true
+                            }
+                        }
+                        if (claimed) {
+                            change.consume()
+                            val target = dismissOffsetY.value + delta.y
+                            scope.launch { dismissOffsetY.snapTo(target) }
+                        }
+                    }
+                    if (claimed) {
+                        val offset = dismissOffsetY.value
+                        val velocityY = velocityTracker.calculateVelocity().y
+                        when {
+                            !cancelled && (offset > dismissDistancePx ||
+                                (offset > touchSlop && velocityY > flingVelocityPx)) -> {
+                                // leave the photo where it was dragged while navigating out
+                                onNavigateBack()
+                            }
+                            !cancelled && (offset < -markDistancePx ||
+                                (offset < -touchSlop && velocityY < -flingVelocityPx)) -> {
+                                toggleMarkBySwipe()
+                                scope.launch { dismissOffsetY.animateTo(0f) }
+                            }
+                            else -> scope.launch { dismissOffsetY.animateTo(0f) }
+                        }
+                    }
+                }
+            }
+    ) {
+
     HorizontalPager(
             state = pagerState,
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier
+                .fillMaxSize()
+                .graphicsLayer {
+                    val offset = dismissOffsetY.value
+                    // up-drag moves with resistance — it marks rather than dismisses
+                    translationY = if (offset >= 0f) offset else offset * 0.35f
+                    val progress = (offset / size.height).coerceIn(0f, 1f)
+                    val shrink = 1f - 0.25f * progress
+                    scaleX = shrink
+                    scaleY = shrink
+                },
             userScrollEnabled = !isCurrentPageZoomed
         ) { page ->
             val photo = photos[page]
@@ -327,7 +434,7 @@ fun ViewerScreen(
         }
 
         AnimatedVisibility(
-            visible = state.isHudOpen && !state.isLongPressing,
+            visible = state.isHudOpen && !state.isLongPressing && dismissOffsetY.value == 0f,
             enter = fadeIn(),
             exit = fadeOut(),
             modifier = Modifier.align(Alignment.BottomCenter)
@@ -368,7 +475,7 @@ fun ViewerScreen(
         }
 
         AnimatedVisibility(
-            visible = !state.isHudOpen && !state.isLongPressing,
+            visible = !state.isHudOpen && !state.isLongPressing && dismissOffsetY.value == 0f,
             enter = fadeIn(),
             exit = fadeOut(),
             modifier = Modifier.align(Alignment.BottomCenter)
@@ -561,8 +668,33 @@ private fun ViewerPhotoPage(
                         true
                     }
                     if (released == true && !dragged) {
-                        onToggleHud()
-                    } else if (released == true) {
+                        // clean tap — wait briefly for a second one (double tap pins)
+                        val secondDown = withTimeoutOrNull(viewConfiguration.doubleTapTimeoutMillis) {
+                            awaitFirstDown(requireUnconsumed = false)
+                        }
+                        if (secondDown == null) {
+                            onToggleHud()
+                        } else {
+                            val secondDownPos = secondDown.position
+                            var secondDragged = false
+                            val secondReleased = withTimeoutOrNull(longPressThreshold.toLong()) {
+                                var event = awaitPointerEvent()
+                                while (event.changes.any { it.pressed }) {
+                                    val change = event.changes.firstOrNull()
+                                    if (change != null && (change.position - secondDownPos).getDistance() > touchSlop) {
+                                        secondDragged = true
+                                    }
+                                    event = awaitPointerEvent()
+                                }
+                                true
+                            }
+                            if (secondReleased == true && !secondDragged) {
+                                onTogglePin()
+                            }
+                        }
+                    } else if (released == true || dragged) {
+                        // finger moved past slop — a swipe (page, zoom-pan, or
+                        // vertical mark/dismiss), never a compare hold
                     } else {
                         onLongPress()
                         while (true) {

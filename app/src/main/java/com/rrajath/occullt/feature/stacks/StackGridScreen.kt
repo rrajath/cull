@@ -29,6 +29,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
@@ -64,6 +67,9 @@ fun StackGridScreen(
     var title by remember { mutableStateOf("") }
 
     val doneKeys by settingsRepository.doneStackKeys.collectAsState(initial = emptySet())
+    // Live mark/pin state so changes made in the viewer show immediately on return
+    val markedIds by settingsRepository.markedIds.collectAsState(initial = emptySet())
+    val pinnedId by settingsRepository.pinnedId.collectAsState(initial = null)
     val currentStackKey = remember(stackPhotos) {
         if (stackPhotos.isEmpty()) null else stackKey(stackPhotos)
     }
@@ -157,6 +163,8 @@ fun StackGridScreen(
                         PhotoSource.Local -> "mediastore"
                         PhotoSource.Immich -> "immich"
                     }
+                    val isMarked = markedIds.contains(photo.id)
+                    val isPinned = pinnedId == photo.id
 
                     Box(
                         modifier = Modifier
@@ -183,7 +191,48 @@ fun StackGridScreen(
                             contentDescription = photo.name,
                             contentScale = ContentScale.Crop,
                             modifier = Modifier.fillMaxSize(),
+                            colorFilter = if (isMarked) ColorFilter.colorMatrix(
+                                ColorMatrix().apply { setToSaturation(0f) }
+                            ) else null
                         )
+
+                        if (isPinned) {
+                            Box(
+                                modifier = Modifier
+                                    .align(Alignment.TopStart)
+                                    .padding(6.dp)
+                                    .size(26.dp)
+                                    .clip(CircleShape)
+                                    .background(colors.pin),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = CullIcons.Pin,
+                                    contentDescription = "Pinned",
+                                    tint = Color.White,
+                                    modifier = Modifier.size(14.dp)
+                                )
+                            }
+                        }
+
+                        if (isMarked) {
+                            Box(
+                                modifier = Modifier
+                                    .align(Alignment.TopEnd)
+                                    .padding(6.dp)
+                                    .size(22.dp)
+                                    .clip(CircleShape)
+                                    .background(colors.danger),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = CullIcons.Trash,
+                                    contentDescription = "Marked for deletion",
+                                    tint = Color.White,
+                                    modifier = Modifier.size(12.dp)
+                                )
+                            }
+                        }
                     }
                 }
             }

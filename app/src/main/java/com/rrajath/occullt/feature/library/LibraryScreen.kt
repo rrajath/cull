@@ -87,6 +87,10 @@ fun LibraryScreen(
     val colors = ThemeColors.current
     val context = LocalContext.current
 
+    // Live mark/pin state so changes made in the viewer show immediately on return
+    val markedIds by settingsRepository.markedIds.collectAsState(initial = emptySet())
+    val pinnedId by settingsRepository.pinnedId.collectAsState(initial = null)
+
     var permissionGranted by remember { mutableStateOf(false) }
     var permissionDenied by remember { mutableStateOf(false) }
 
@@ -297,8 +301,8 @@ fun LibraryScreen(
                     items = state.photos,
                     key = { _, photo -> photo.id }
                 ) { index, photo ->
-                    val isMarked = state.markedIds.contains(photo.id)
-                    val isPinned = state.pinnedId == photo.id
+                    val isMarked = markedIds.contains(photo.id)
+                    val isPinned = pinnedId == photo.id
 
                     Box(
                         modifier = Modifier
@@ -423,7 +427,7 @@ fun LibraryScreen(
                 }
             }
 
-            if (state.markedIds.isNotEmpty()) {
+            if (markedIds.isNotEmpty()) {
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
@@ -439,7 +443,7 @@ fun LibraryScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "${state.markedIds.size} marked",
+                            text = "${markedIds.size} marked",
                             style = androidx.compose.material3.MaterialTheme.typography.labelLarge.copy(
                                 color = colors.fgDim,
                                 fontSize = 12.sp
