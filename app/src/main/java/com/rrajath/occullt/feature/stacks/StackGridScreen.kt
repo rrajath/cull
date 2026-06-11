@@ -20,9 +20,11 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -35,11 +37,15 @@ import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
 import com.rrajath.occullt.core.datastore.PhotoCache
 import com.rrajath.occullt.core.datastore.SettingsRepository
+import com.rrajath.occullt.core.grouping.stackKey
 import com.rrajath.occullt.core.model.PhotoSource
 import com.rrajath.occullt.core.model.UnifiedPhotoItem
 import com.rrajath.occullt.ui.component.CircleIcon
+import com.rrajath.occullt.ui.component.DoneLabel
+import com.rrajath.occullt.ui.component.MarkDonePill
 import com.rrajath.occullt.ui.icon.CullIcons
 import com.rrajath.occullt.ui.theme.ThemeColors
+import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -53,8 +59,15 @@ fun StackGridScreen(
     modifier: Modifier = Modifier,
 ) {
     val colors = ThemeColors.current
+    val scope = rememberCoroutineScope()
     var stackPhotos by remember { mutableStateOf<List<UnifiedPhotoItem>>(emptyList()) }
     var title by remember { mutableStateOf("") }
+
+    val doneKeys by settingsRepository.doneStackKeys.collectAsState(initial = emptySet())
+    val currentStackKey = remember(stackPhotos) {
+        if (stackPhotos.isEmpty()) null else stackKey(stackPhotos)
+    }
+    val isDone = currentStackKey != null && doneKeys.contains(currentStackKey)
 
     LaunchedEffect(stackIndex) {
         val photos = PhotoStackCache.stacks[stackIndex]
@@ -97,7 +110,7 @@ fun StackGridScreen(
                     )
                 }
             )
-            Column {
+            Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = "Burst",
                     style = androidx.compose.material3.MaterialTheme.typography.titleLarge.copy(
@@ -112,6 +125,18 @@ fun StackGridScreen(
                         fontSize = 12.sp
                     )
                 )
+            }
+            if (currentStackKey != null) {
+                if (isDone) {
+                    DoneLabel()
+                } else {
+                    MarkDonePill(onClick = {
+                        scope.launch {
+                            settingsRepository.addDoneStackKey(currentStackKey)
+                            onNavigateBack()
+                        }
+                    })
+                }
             }
         }
 

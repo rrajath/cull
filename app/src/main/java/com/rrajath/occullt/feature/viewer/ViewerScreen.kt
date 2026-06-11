@@ -97,7 +97,7 @@ fun ViewerScreen(
     photoIndex: Int,
     folderUri: String?,
     onNavigateBack: () -> Unit,
-    onDeleteCompleted: () -> Unit,
+    onDeleteCompleted: (deletedCount: Int) -> Unit,
     settingsRepository: SettingsRepository,
     modifier: Modifier = Modifier,
 ) {
@@ -410,6 +410,7 @@ fun ViewerScreen(
                         val mirrorDeletes = settingsRepository.mirrorDeletes.first()
 
                         var deleteSummary: DeleteSummary? = null
+                        var deletedPhotoCount = 0
 
                         if (!dryRun) {
                             val immichUrl = settingsRepository.immichUrl.first()
@@ -429,6 +430,8 @@ fun ViewerScreen(
 
                             val result = unifiedRepo.deletePhotos(photosToDelete, mirrorDeletes)
                             deleteSummary = result.getOrNull()
+                            // photo count, not local+immich sum (hybrid photos exist in both)
+                            deletedPhotoCount = photosToDelete.size
                         }
 
                         delay(800)
@@ -467,7 +470,7 @@ fun ViewerScreen(
                                 }
                             }
                             viewModel.hideDeleteDialog()
-                            onDeleteCompleted()
+                            onDeleteCompleted(deletedPhotoCount)
                         }
                     }
                 },

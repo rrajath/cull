@@ -23,4 +23,10 @@ sealed interface Route {
 
     @Serializable
     data class StackGrid(val stackIndex: Int) : Route
+
+    @Serializable
+    data object Wizard : Route
+
+    @Serializable
+    data class WizardMonth(val monthKey: String) : Route
 }

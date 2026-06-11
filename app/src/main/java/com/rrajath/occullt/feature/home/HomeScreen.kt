@@ -26,7 +26,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontStyle
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.rrajath.occullt.core.datastore.SettingsRepository
@@ -36,6 +35,7 @@ import com.rrajath.occullt.ui.component.GiantButton
 import com.rrajath.occullt.ui.component.SourceMode
 import com.rrajath.occullt.ui.component.SourceSwitcher
 import com.rrajath.occullt.ui.icon.CullIcons
+import com.rrajath.occullt.ui.theme.CatppuccinAccents
 import com.rrajath.occullt.ui.theme.ThemeColors
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
@@ -45,6 +45,7 @@ fun HomeScreen(
     onNavigateToLibrary: () -> Unit,
     onNavigateToSettings: () -> Unit,
     onContinueSession: (Int, String?) -> Unit,
+    onNavigateToWizard: () -> Unit,
     settingsRepository: SettingsRepository,
     modifier: Modifier = Modifier,
 ) {
@@ -54,11 +55,17 @@ fun HomeScreen(
     var hasSession by remember { mutableStateOf(false) }
     var lastPhotoIndex by remember { mutableStateOf(0) }
     var lastFolderUri by remember { mutableStateOf<String?>(null) }
+    var accentHue by remember { mutableStateOf(0) }
 
     LaunchedEffect(settingsRepository) {
         launch {
             settingsRepository.sourceMode.collectLatest { mode ->
                 sourceMode = mode
+            }
+        }
+        launch {
+            settingsRepository.accentHue.collectLatest { hue ->
+                accentHue = hue
             }
         }
         launch {
@@ -169,25 +176,14 @@ fun HomeScreen(
 
             Spacer(modifier = Modifier.height(12.dp))
 
+            // A palette hue offset from the selected accent so the two
+            // buttons stay distinguishable whatever accent the user picks
             GiantButton(
                 title = "Wizard",
-                subtitle = "Coming soon",
-                onClick = {},
-                accentBackground = false,
-                enabled = false,
-                minHeight = 118.dp
-            )
-
-            Spacer(modifier = Modifier.height(20.dp))
-
-            Text(
-                text = "CULL V1.0.0",
-                style = androidx.compose.material3.MaterialTheme.typography.labelLarge.copy(
-                    color = colors.fgFaint,
-                    fontSize = 11.sp,
-                    letterSpacing = 1.6.sp,
-                    fontWeight = FontWeight.Bold
-                )
+                subtitle = "Cull month by month",
+                onClick = onNavigateToWizard,
+                backgroundColor = CatppuccinAccents[(accentHue + 4) % CatppuccinAccents.size].color,
+                minHeight = 160.dp
             )
 
             Spacer(modifier = Modifier.height(8.dp))

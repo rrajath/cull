@@ -39,17 +39,19 @@ fun GiantButton(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     accentBackground: Boolean = true,
+    backgroundColor: Color? = null,
     minHeight: Dp = 160.dp,
 ) {
     val colors = ThemeColors.current
+    val filled = enabled && (backgroundColor != null || accentBackground)
     Box(
         modifier = modifier
             .fillMaxWidth()
             .height(minHeight)
             .clip(RoundedCornerShape(32.dp))
             .then(
-                if (accentBackground && enabled) {
-                    Modifier.background(colors.accent)
+                if (filled) {
+                    Modifier.background(backgroundColor ?: colors.accent)
                 } else if (enabled) {
                     Modifier
                         .background(colors.bgElev)
@@ -75,7 +77,7 @@ fun GiantButton(
                 Text(
                     text = title,
                     style = GiantButtonTitleStyle.copy(
-                        color = if (accentBackground) Color.White else colors.fg,
+                        color = if (filled) Color.White else colors.fg,
                         fontStyle = FontStyle.Italic
                     ),
                     fontSize = 44.sp
@@ -84,7 +86,7 @@ fun GiantButton(
                     Text(
                         text = subtitle,
                         style = GiantButtonSubtitleStyle.copy(
-                            color = if (accentBackground) Color.White.copy(alpha = 0.7f) else colors.fgDim
+                            color = if (filled) Color.White.copy(alpha = 0.7f) else colors.fgDim
                         ),
                         modifier = Modifier.padding(top = 4.dp)
                     )
@@ -96,7 +98,7 @@ fun GiantButton(
                         .size(44.dp)
                         .clip(CircleShape)
                         .background(
-                            if (accentBackground) Color.White.copy(alpha = 0.2f) else colors.bgElev2
+                            if (filled) Color.White.copy(alpha = 0.2f) else colors.bgElev2
                         ),
                     contentAlignment = Alignment.Center
                 ) {

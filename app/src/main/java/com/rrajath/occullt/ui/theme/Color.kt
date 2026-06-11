@@ -39,3 +39,15 @@ val Danger = Color(0xFFD94F35)
 val DangerSoft = Color(0xFF4A1F18)
 val LightDangerSoft = Color(0xFFF5E0D8)
 val Pin = Color(0xFFF5A060)
+
+// Wizard segment states — fixed colors, independent of the selectable accent
+// so Complete (blue) and In Progress (amber) stay distinguishable on any hue
+val WizardComplete = Color(0xFF8BAAFF)
+val WizardCompleteOn = Color(0xFF12286A)
+val WizardCompleteOnDim = Color(0xFF2D4D9A)
+val WizardCompleteSoftDark = Color(0xFF1E2A4A)
+val WizardCompleteSoftLight = Color(0xFFD4E0F5)
+val WizardInProgressDark = Color(0xFFC17B28)
+val WizardInProgressLight = Color(0xFF9A5F16)
+val WizardInProgressSoftDark = Color(0xFF3D2E1A)
+val WizardInProgressSoftLight = Color(0xFFF5E6CF)

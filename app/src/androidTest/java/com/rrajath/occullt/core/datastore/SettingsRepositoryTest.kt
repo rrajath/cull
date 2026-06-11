@@ -42,6 +42,23 @@ class SettingsRepositoryTest {
         repo.setMarkedIds(emptySet())
         repo.setPinnedId(null)
         repo.setGroupingWindowMinutes(2)
+        repo.setDoneStackKeys(emptySet())
+    }
+
+    @Test
+    fun doneStackKeysRoundTrip() = runBlocking {
+        assertTrue(repo.doneStackKeys.first().isEmpty())
+
+        repo.addDoneStackKey("abc123")
+        repo.addDoneStackKey("def456")
+        assertEquals(setOf("abc123", "def456"), repo.doneStackKeys.first())
+
+        // adding an existing key is idempotent
+        repo.addDoneStackKey("abc123")
+        assertEquals(setOf("abc123", "def456"), repo.doneStackKeys.first())
+
+        repo.setDoneStackKeys(emptySet())
+        assertTrue(repo.doneStackKeys.first().isEmpty())
     }
 
     @Test

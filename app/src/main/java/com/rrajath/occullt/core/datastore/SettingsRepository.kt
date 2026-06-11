@@ -33,6 +33,7 @@ class SettingsRepository(context: Context) {
         val MARKED_IDS = stringPreferencesKey("marked_ids")
         val PINNED_ID = stringPreferencesKey("pinned_id")
         val GROUPING_WINDOW_MINUTES = intPreferencesKey("grouping_window_minutes")
+        val DONE_STACK_KEYS = stringPreferencesKey("done_stack_keys")
     }
 
     val sourceMode: Flow<SourceMode> = dataStore.data.map { prefs ->
@@ -92,6 +93,26 @@ class SettingsRepository(context: Context) {
 
     val groupingWindowMinutes: Flow<Int> = dataStore.data.map { prefs ->
         prefs[Keys.GROUPING_WINDOW_MINUTES] ?: 2
+    }
+
+    // Fingerprints of stacks the user marked done (see core/grouping stackKey)
+    val doneStackKeys: Flow<Set<String>> = dataStore.data.map { prefs ->
+        val raw = prefs[Keys.DONE_STACK_KEYS] ?: ""
+        if (raw.isEmpty()) emptySet() else raw.split(",").toSet()
+    }
+
+    suspend fun addDoneStackKey(key: String) {
+        dataStore.edit { prefs ->
+            val raw = prefs[Keys.DONE_STACK_KEYS] ?: ""
+            val keys = if (raw.isEmpty()) emptySet() else raw.split(",").toSet()
+            prefs[Keys.DONE_STACK_KEYS] = (keys + key).joinToString(",")
+        }
+    }
+
+    suspend fun setDoneStackKeys(keys: Set<String>) {
+        dataStore.edit { prefs ->
+            prefs[Keys.DONE_STACK_KEYS] = keys.joinToString(",")
+        }
     }
 
     suspend fun setSourceMode(mode: SourceMode) {

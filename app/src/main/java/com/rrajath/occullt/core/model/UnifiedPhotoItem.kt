@@ -12,6 +12,9 @@ data class UnifiedPhotoItem(
     val uri: Uri,
     val name: String,
     val dateModified: Long = 0,
+    // Epoch ms of capture: EXIF date-taken when available, falling back to
+    // file/asset modification time, so it is always populated.
+    val dateTaken: Long = 0,
     val source: PhotoSource = PhotoSource.Local,
     val immichAssetId: String? = null,
     val thumbnailUrl: String? = null,

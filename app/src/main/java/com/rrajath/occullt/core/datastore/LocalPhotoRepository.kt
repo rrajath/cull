@@ -31,12 +31,15 @@ class LocalPhotoRepository(private val context: Context) {
                 val extension = name.substringAfterLast('.', "").lowercase()
                 if (extension in imageExtensions) {
                     file.uri?.let { uri ->
+                        // SAF gives no cheap EXIF access; lastModified is the date-taken fallback
+                        val lastModified = file.lastModified()
                         photos.add(
                             PhotoItem(
                                 id = name,
                                 uri = uri,
                                 name = name,
-                                dateModified = file.lastModified()
+                                dateModified = lastModified,
+                                dateTaken = lastModified
                             )
                         )
                     }
@@ -55,6 +58,7 @@ class LocalPhotoRepository(private val context: Context) {
             MediaStore.Images.Media._ID,
             MediaStore.Images.Media.DISPLAY_NAME,
             MediaStore.Images.Media.DATE_MODIFIED,
+            MediaStore.Images.Media.DATE_TAKEN,
             MediaStore.Images.Media.RELATIVE_PATH
         )
         val selection = "${MediaStore.Images.Media.RELATIVE_PATH} LIKE ?"
@@ -71,11 +75,14 @@ class LocalPhotoRepository(private val context: Context) {
             val idColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media._ID)
             val nameColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DISPLAY_NAME)
             val modifiedColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DATE_MODIFIED)
+            val takenColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DATE_TAKEN)
 
             while (cursor.moveToNext()) {
                 val id = cursor.getLong(idColumn)
                 val name = cursor.getString(nameColumn)
                 val dateModified = cursor.getLong(modifiedColumn)
+                // DATE_TAKEN is in milliseconds; DATE_MODIFIED is in seconds
+                val dateTaken = cursor.getLong(takenColumn)
                 val uri: Uri = ContentUris.withAppendedId(
                     MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
                     id
@@ -85,7 +92,8 @@ class LocalPhotoRepository(private val context: Context) {
                         id = id.toString(),
                         uri = uri,
                         name = name,
-                        dateModified = dateModified * 1000
+                        dateModified = dateModified * 1000,
+                        dateTaken = if (dateTaken > 0) dateTaken else dateModified * 1000
                     )
                 )
             }

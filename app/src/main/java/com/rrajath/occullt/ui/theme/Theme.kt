@@ -26,6 +26,12 @@ data class ExtendedColorScheme(
     val dangerSoft: Color,
     val pin: Color,
     val scrim: Color,
+    val wizardComplete: Color,
+    val wizardCompleteOn: Color,
+    val wizardCompleteOnDim: Color,
+    val wizardCompleteSoft: Color,
+    val wizardInProgress: Color,
+    val wizardInProgressSoft: Color,
 )
 
 private fun accentPalette(index: Int): AccentColor {
@@ -48,6 +54,12 @@ private fun DarkExtendedColorScheme(accentIndex: Int) = ExtendedColorScheme(
     dangerSoft = DangerSoft,
     pin = accentPalette(accentIndex).color,
     scrim = DarkScrim,
+    wizardComplete = WizardComplete,
+    wizardCompleteOn = WizardCompleteOn,
+    wizardCompleteOnDim = WizardCompleteOnDim,
+    wizardCompleteSoft = WizardCompleteSoftDark,
+    wizardInProgress = WizardInProgressDark,
+    wizardInProgressSoft = WizardInProgressSoftDark,
 )
 
 private fun LightExtendedColorScheme(accentIndex: Int) = ExtendedColorScheme(
@@ -65,6 +77,12 @@ private fun LightExtendedColorScheme(accentIndex: Int) = ExtendedColorScheme(
     dangerSoft = LightDangerSoft,
     pin = accentPalette(accentIndex).color,
     scrim = LightScrim,
+    wizardComplete = WizardComplete,
+    wizardCompleteOn = WizardCompleteOn,
+    wizardCompleteOnDim = WizardCompleteOnDim,
+    wizardCompleteSoft = WizardCompleteSoftLight,
+    wizardInProgress = WizardInProgressLight,
+    wizardInProgressSoft = WizardInProgressSoftLight,
 )
 
 private val DarkColorScheme = darkColorScheme(

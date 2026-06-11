@@ -1,0 +1,555 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cull — Wizard Screens (v1 Mockup)</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css" />
+  <style>
+    body {
+      margin: 0;
+      padding: 40px 20px 60px;
+      background: #1A1A1A;
+      font-family: -apple-system, 'SF Pro Text', 'Helvetica Neue', sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    h1 {
+      color: #888;
+      font-size: 11px;
+      letter-spacing: .14em;
+      text-transform: uppercase;
+      font-weight: 500;
+      margin: 0 0 48px;
+    }
+
+    :root {
+      --ab: #8BAAFF;
+      --ab-t: #12286A;
+      --ab-s: #2D4D9A;
+      --am: #C17B28;
+      --bg: #0A0A0A;
+      --card: #161616;
+      --card2: #1D1D1D;
+      --t1: #FFFFFF;
+      --t2: #888888;
+      --t3: #444444;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    /* Screen wrapper */
+    .sc-section { width: 340px; margin-bottom: 60px; }
+    .sc-label {
+      text-align: center;
+      font-size: 10px;
+      color: #666;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+      margin-bottom: 12px;
+    }
+
+    /* Phone frame */
+    .ph {
+      background: var(--bg);
+      border-radius: 40px;
+      border: 1.5px solid #2A2A2A;
+      overflow: hidden;
+      color: var(--t1);
+    }
+
+    /* Status bar */
+    .sb {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 14px 22px 4px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .sb-r { display: flex; gap: 5px; align-items: center; font-size: 13px; color: #AAA; }
+
+    /* Nav bar */
+    .nv { display: flex; align-items: flex-start; padding: 8px 16px 10px; gap: 12px; }
+    .nv-mid { align-items: center; }
+    .cbtn {
+      width: 36px; height: 36px; border-radius: 50%;
+      background: var(--card2);
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0; color: var(--t1);
+    }
+    .nt { flex: 1; min-width: 0; }
+    .nh {
+      font-family: Georgia, 'Times New Roman', serif;
+      font-style: italic;
+      font-size: 27px;
+      font-weight: normal;
+      line-height: 1.05;
+    }
+    .nh-sm { font-size: 22px; }
+    .ns2 { font-size: 12px; color: var(--t2); margin-top: 3px; }
+
+    /* Content */
+    .cx { padding: 0 16px 24px; }
+    .hbar { width: 100px; height: 4px; background: #2A2A2A; border-radius: 2px; margin: 8px auto 14px; }
+
+    /* Section label */
+    .sl { font-size: 10px; color: var(--t3); letter-spacing: .1em; text-transform: uppercase; margin: 16px 0 8px; }
+
+    /* In-progress continue cards */
+    .cc {
+      background: var(--card);
+      border: 1.5px solid var(--am);
+      border-radius: 16px;
+      padding: 12px 14px;
+      display: flex; align-items: center; gap: 10px;
+      margin-bottom: 8px;
+    }
+    .cc-info { flex: 1; }
+    .cc-name { font-size: 15px; font-weight: 500; }
+    .cc-sub { font-size: 12px; color: var(--t2); margin-top: 2px; }
+    .am-arrow { color: var(--am); font-size: 17px; }
+
+    /* Legend */
+    .leg { display: flex; gap: 12px; margin: 6px 0 12px; }
+    .li { display: flex; align-items: center; gap: 5px; font-size: 10px; color: var(--t2); }
+    .dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+    .d-cp { background: var(--ab); }
+    .d-ip { background: var(--am); }
+    .d-ns { background: transparent; border: 1px solid #3A3A3A; }
+
+    /* Year label */
+    .yl { font-size: 11px; color: var(--t3); letter-spacing: .08em; text-transform: uppercase; font-weight: 500; margin: 14px 0 8px; }
+
+    /* Month grid */
+    .mg { display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; margin-bottom: 4px; }
+    .mc { border-radius: 12px; padding: 9px 8px 8px; min-height: 58px; }
+    .mc .mn { font-size: 13px; font-weight: 500; line-height: 1; }
+    .mc .mk { font-size: 10px; margin-top: 4px; }
+    .mc.ns { background: var(--card); border: 1px solid #222; }
+    .mc.ns .mn { color: #3E3E3E; }
+    .mc.ns .mk { color: #2E2E2E; }
+    .mc.ip { background: var(--card); border: 1.5px solid var(--am); }
+    .mc.ip .mn { color: #EEE; }
+    .mc.ip .mk { color: #777; }
+    .mc.cp { background: var(--ab); }
+    .mc.cp .mn { color: var(--ab-t); }
+    .mc.cp .mk { color: var(--ab-s); }
+
+    /* Stack items */
+    .si {
+      background: var(--card);
+      border-radius: 16px;
+      padding: 12px;
+      display: flex; align-items: center; gap: 12px;
+      margin-bottom: 8px;
+    }
+    .sth { width: 54px; height: 54px; border-radius: 10px; flex-shrink: 0; position: relative; }
+    .sth-img { width: 100%; height: 100%; border-radius: 10px; display: block; }
+    .sbadge {
+      position: absolute; top: 3px; left: 3px;
+      background: rgba(0,0,0,.65);
+      border-radius: 6px; font-size: 10px; padding: 1px 5px;
+      font-weight: 600; color: #fff;
+    }
+    .si-info { flex: 1; }
+    .si-t { font-size: 13px; font-weight: 500; }
+    .si-c { font-size: 12px; color: var(--t2); margin-top: 2px; }
+    .si-arr { font-size: 16px; color: var(--t3); }
+
+    /* Mark done pill (nav) */
+    .mkpill {
+      background: var(--ab);
+      border-radius: 20px;
+      padding: 7px 12px;
+      font-size: 12px; font-weight: 500;
+      color: var(--ab-t);
+      display: flex; align-items: center; gap: 4px;
+      white-space: nowrap; flex-shrink: 0;
+    }
+
+    /* Mark complete full-width button */
+    .mk-btn {
+      background: var(--ab);
+      border-radius: 14px;
+      padding: 15px;
+      text-align: center;
+      font-weight: 500; font-size: 15px;
+      color: var(--ab-t);
+      margin-top: 8px;
+    }
+
+    /* Bottom sheet (screen 3) */
+    .bso { display: flex; flex-direction: column; }
+    .bso-behind { min-height: 220px; position: relative; overflow: hidden; }
+    .bso-overlay { position: absolute; inset: 0; background: rgba(0,0,0,.65); z-index: 1; }
+    .bs { background: #181818; border-radius: 24px 24px 0 0; padding: 16px 20px 0; }
+    .bsh { width: 36px; height: 4px; background: #333; border-radius: 2px; margin: 0 auto 18px; }
+    .bst { font-family: Georgia, serif; font-style: italic; font-size: 22px; font-weight: normal; margin-bottom: 8px; }
+    .bsb { font-size: 13px; color: var(--t2); line-height: 1.55; margin-bottom: 20px; }
+    .bp {
+      background: var(--ab);
+      border-radius: 14px; padding: 14px;
+      text-align: center; font-weight: 500;
+      color: var(--ab-t); font-size: 15px; margin-bottom: 10px;
+    }
+    .bqq {
+      border: 1px solid #2A2A2A; border-radius: 14px;
+      padding: 14px; text-align: center;
+      font-size: 15px; color: var(--t1); margin-bottom: 24px;
+    }
+
+    /* Guidance text (first launch) */
+    .guidance {
+      font-size: 13px; color: var(--t3);
+      text-align: center; padding: 4px 0 18px;
+      font-style: italic;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Cull — Wizard Screens · v1 Mockup</h1>
+
+  <!-- ===================== SCREEN 1: Wizard Home ===================== -->
+  <div class="sc-section">
+    <p class="sc-label">1 — Wizard home</p>
+    <div class="ph">
+      <div class="sb">
+        <span>12:12</span>
+        <div class="sb-r">
+          <i class="ti ti-wifi" aria-hidden="true"></i>
+          <i class="ti ti-battery-charging" aria-hidden="true"></i>
+        </div>
+      </div>
+
+      <div class="nv">
+        <div class="cbtn"><i class="ti ti-arrow-left" style="font-size:16px" aria-hidden="true"></i></div>
+        <div class="nt">
+          <div class="nh">Wizard</div>
+          <div class="ns2">18 months · Hybrid</div>
+        </div>
+      </div>
+
+      <div class="cx">
+        <div class="sl">In progress</div>
+
+        <div class="cc">
+          <div class="cc-info">
+            <div class="cc-name">January 2026</div>
+            <div class="cc-sub">47 photos · last culled 2 days ago</div>
+          </div>
+          <i class="ti ti-arrow-right am-arrow" aria-hidden="true"></i>
+        </div>
+
+        <div class="cc">
+          <div class="cc-info">
+            <div class="cc-name">March 2025</div>
+            <div class="cc-sub">83 photos · last culled 5 days ago</div>
+          </div>
+          <i class="ti ti-arrow-right am-arrow" aria-hidden="true"></i>
+        </div>
+
+        <div class="sl" style="margin-top:20px">Coverage map</div>
+
+        <div class="leg">
+          <div class="li"><div class="dot d-cp"></div>Complete</div>
+          <div class="li"><div class="dot d-ip"></div>In progress</div>
+          <div class="li"><div class="dot d-ns"></div>Not started</div>
+        </div>
+
+        <div class="yl">2026</div>
+        <div class="mg">
+          <div class="mc ip"><div class="mn">Jun</div><div class="mk">32 photos</div></div>
+          <div class="mc cp"><div class="mn">May</div><div class="mk">64 photos</div></div>
+          <div class="mc cp"><div class="mn">Apr</div><div class="mk">41 photos</div></div>
+          <div class="mc cp"><div class="mn">Mar</div><div class="mk">58 photos</div></div>
+          <div class="mc cp"><div class="mn">Feb</div><div class="mk">29 photos</div></div>
+          <div class="mc ip"><div class="mn">Jan</div><div class="mk">47 photos</div></div>
+        </div>
+
+        <div class="yl">2025</div>
+        <div class="mg">
+          <div class="mc ns"><div class="mn">Dec</div><div class="mk">118 photos</div></div>
+          <div class="mc ns"><div class="mn">Nov</div><div class="mk">92 photos</div></div>
+          <div class="mc ns"><div class="mn">Oct</div><div class="mk">75 photos</div></div>
+          <div class="mc ns"><div class="mn">Sep</div><div class="mk">61 photos</div></div>
+          <div class="mc ns"><div class="mn">Aug</div><div class="mk">143 photos</div></div>
+          <div class="mc ns"><div class="mn">Jul</div><div class="mk">98 photos</div></div>
+          <div class="mc cp"><div class="mn">Jun</div><div class="mk">55 photos</div></div>
+          <div class="mc cp"><div class="mn">May</div><div class="mk">77 photos</div></div>
+          <div class="mc cp"><div class="mn">Apr</div><div class="mk">34 photos</div></div>
+          <div class="mc ip"><div class="mn">Mar</div><div class="mk">83 photos</div></div>
+          <div class="mc cp"><div class="mn">Feb</div><div class="mk">22 photos</div></div>
+          <div class="mc cp"><div class="mn">Jan</div><div class="mk">67 photos</div></div>
+        </div>
+      </div>
+      <div class="hbar"></div>
+    </div>
+  </div>
+
+  <!-- ===================== SCREEN 1b: Wizard Home — First Launch ===================== -->
+  <div class="sc-section">
+    <p class="sc-label">1b — Wizard home (first launch)</p>
+    <div class="ph">
+      <div class="sb">
+        <span>12:12</span>
+        <div class="sb-r">
+          <i class="ti ti-wifi" aria-hidden="true"></i>
+          <i class="ti ti-battery-charging" aria-hidden="true"></i>
+        </div>
+      </div>
+
+      <div class="nv">
+        <div class="cbtn"><i class="ti ti-arrow-left" style="font-size:16px" aria-hidden="true"></i></div>
+        <div class="nt">
+          <div class="nh">Wizard</div>
+          <div class="ns2">18 months · Hybrid</div>
+        </div>
+      </div>
+
+      <div class="cx">
+        <div class="guidance">Tap any month to start culling.</div>
+
+        <div class="leg">
+          <div class="li"><div class="dot d-cp"></div>Complete</div>
+          <div class="li"><div class="dot d-ip"></div>In progress</div>
+          <div class="li"><div class="dot d-ns"></div>Not started</div>
+        </div>
+
+        <div class="yl">2026</div>
+        <div class="mg">
+          <div class="mc ns"><div class="mn">Jun</div><div class="mk">32 photos</div></div>
+          <div class="mc ns"><div class="mn">May</div><div class="mk">64 photos</div></div>
+          <div class="mc ns"><div class="mn">Apr</div><div class="mk">41 photos</div></div>
+          <div class="mc ns"><div class="mn">Mar</div><div class="mk">58 photos</div></div>
+          <div class="mc ns"><div class="mn">Feb</div><div class="mk">29 photos</div></div>
+          <div class="mc ns"><div class="mn">Jan</div><div class="mk">47 photos</div></div>
+        </div>
+
+        <div class="yl">2025</div>
+        <div class="mg">
+          <div class="mc ns"><div class="mn">Dec</div><div class="mk">118 photos</div></div>
+          <div class="mc ns"><div class="mn">Nov</div><div class="mk">92 photos</div></div>
+          <div class="mc ns"><div class="mn">Oct</div><div class="mk">75 photos</div></div>
+          <div class="mc ns"><div class="mn">Sep</div><div class="mk">61 photos</div></div>
+          <div class="mc ns"><div class="mn">Aug</div><div class="mk">143 photos</div></div>
+          <div class="mc ns"><div class="mn">Jul</div><div class="mk">98 photos</div></div>
+          <div class="mc ns"><div class="mn">Jun</div><div class="mk">55 photos</div></div>
+          <div class="mc ns"><div class="mn">May</div><div class="mk">77 photos</div></div>
+          <div class="mc ns"><div class="mn">Apr</div><div class="mk">34 photos</div></div>
+          <div class="mc ns"><div class="mn">Mar</div><div class="mk">83 photos</div></div>
+          <div class="mc ns"><div class="mn">Feb</div><div class="mk">22 photos</div></div>
+          <div class="mc ns"><div class="mn">Jan</div><div class="mk">67 photos</div></div>
+        </div>
+      </div>
+      <div class="hbar"></div>
+    </div>
+  </div>
+
+  <!-- ===================== SCREEN 2: Month Segment View (In Progress) ===================== -->
+  <div class="sc-section">
+    <p class="sc-label">2 — Month view · In progress (January 2026)</p>
+    <div class="ph">
+      <div class="sb">
+        <span>12:13</span>
+        <div class="sb-r">
+          <i class="ti ti-wifi" aria-hidden="true"></i>
+          <i class="ti ti-battery-charging" aria-hidden="true"></i>
+        </div>
+      </div>
+
+      <div class="nv nv-mid">
+        <div class="cbtn"><i class="ti ti-arrow-left" style="font-size:16px" aria-hidden="true"></i></div>
+        <div class="nt">
+          <div class="nh nh-sm">January 2026</div>
+          <div class="ns2">47 photos · 4 stacks · In progress</div>
+        </div>
+        <div class="mkpill">
+          <i class="ti ti-check" style="font-size:12px" aria-hidden="true"></i>
+          Mark done
+        </div>
+      </div>
+
+      <div class="cx">
+        <div class="si">
+          <div class="sth">
+            <div class="sth-img" style="background:#6B4B3E;"></div>
+            <div class="sbadge">12</div>
+          </div>
+          <div class="si-info">
+            <div class="si-t">Jan 8, 10:15 AM – 10:18 AM</div>
+            <div class="si-c">12 photos</div>
+          </div>
+          <i class="ti ti-arrow-right si-arr" aria-hidden="true"></i>
+        </div>
+
+        <div class="si">
+          <div class="sth">
+            <div class="sth-img" style="background:#3A5545;"></div>
+            <div class="sbadge">18</div>
+          </div>
+          <div class="si-info">
+            <div class="si-t">Jan 14, 3:45 PM – 3:52 PM</div>
+            <div class="si-c">18 photos</div>
+          </div>
+          <i class="ti ti-arrow-right si-arr" aria-hidden="true"></i>
+        </div>
+
+        <div class="si">
+          <div class="sth">
+            <div class="sth-img" style="background:#2B3F5C;"></div>
+            <div class="sbadge">9</div>
+          </div>
+          <div class="si-info">
+            <div class="si-t">Jan 22, 2:10 PM – 2:15 PM</div>
+            <div class="si-c">9 photos</div>
+          </div>
+          <i class="ti ti-arrow-right si-arr" aria-hidden="true"></i>
+        </div>
+
+        <div class="si">
+          <div class="sth">
+            <div class="sth-img" style="background:#52402F;"></div>
+            <div class="sbadge">8</div>
+          </div>
+          <div class="si-info">
+            <div class="si-t">Jan 28, 9:00 AM – 9:04 AM</div>
+            <div class="si-c">8 photos</div>
+          </div>
+          <i class="ti ti-arrow-right si-arr" aria-hidden="true"></i>
+        </div>
+
+        <div class="mk-btn">Mark January 2026 as complete</div>
+      </div>
+      <div class="hbar"></div>
+    </div>
+  </div>
+
+  <!-- ===================== SCREEN 2b: Month Segment View (Complete) ===================== -->
+  <div class="sc-section">
+    <p class="sc-label">2b — Month view · Complete (May 2026)</p>
+    <div class="ph">
+      <div class="sb">
+        <span>12:13</span>
+        <div class="sb-r">
+          <i class="ti ti-wifi" aria-hidden="true"></i>
+          <i class="ti ti-battery-charging" aria-hidden="true"></i>
+        </div>
+      </div>
+
+      <div class="nv nv-mid">
+        <div class="cbtn"><i class="ti ti-arrow-left" style="font-size:16px" aria-hidden="true"></i></div>
+        <div class="nt">
+          <div class="nh nh-sm">May 2026</div>
+          <div class="ns2">64 photos · 5 stacks · Complete</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--ab);flex-shrink:0;">
+          <i class="ti ti-check" style="font-size:13px" aria-hidden="true"></i>
+          <span>Complete</span>
+        </div>
+      </div>
+
+      <div class="cx">
+        <div class="si">
+          <div class="sth">
+            <div class="sth-img" style="background:#3A4F6B;"></div>
+            <div class="sbadge">14</div>
+          </div>
+          <div class="si-info">
+            <div class="si-t">May 3, 9:10 AM – 9:14 AM</div>
+            <div class="si-c">14 photos</div>
+          </div>
+          <i class="ti ti-arrow-right si-arr" aria-hidden="true"></i>
+        </div>
+
+        <div class="si">
+          <div class="sth">
+            <div class="sth-img" style="background:#4A5C3A;"></div>
+            <div class="sbadge">22</div>
+          </div>
+          <div class="si-info">
+            <div class="si-t">May 10, 1:30 PM – 1:38 PM</div>
+            <div class="si-c">22 photos</div>
+          </div>
+          <i class="ti ti-arrow-right si-arr" aria-hidden="true"></i>
+        </div>
+
+        <div class="si">
+          <div class="sth">
+            <div class="sth-img" style="background:#5C3A3A;"></div>
+            <div class="sbadge">11</div>
+          </div>
+          <div class="si-info">
+            <div class="si-t">May 17, 4:05 PM – 4:09 PM</div>
+            <div class="si-c">11 photos</div>
+          </div>
+          <i class="ti ti-arrow-right si-arr" aria-hidden="true"></i>
+        </div>
+
+        <div class="si">
+          <div class="sth">
+            <div class="sth-img" style="background:#3A4A55;"></div>
+            <div class="sbadge">17</div>
+          </div>
+          <div class="si-info">
+            <div class="si-t">May 24, 11:15 AM – 11:22 AM</div>
+            <div class="si-c">17 photos</div>
+          </div>
+          <i class="ti ti-arrow-right si-arr" aria-hidden="true"></i>
+        </div>
+      </div>
+      <div class="hbar"></div>
+    </div>
+  </div>
+
+  <!-- ===================== SCREEN 3: Mark as Complete (bottom sheet) ===================== -->
+  <div class="sc-section">
+    <p class="sc-label">3 — Mark as complete</p>
+    <div class="ph">
+      <div class="bso">
+        <div class="bso-behind">
+          <div class="bso-overlay"></div>
+          <div style="padding:14px 22px 4px; display:flex; justify-content:space-between; align-items:center;">
+            <span style="font-size:12px;font-weight:600;">12:13</span>
+          </div>
+          <div style="display:flex;align-items:center;padding:8px 16px 10px;gap:12px;">
+            <div class="cbtn" style="opacity:.5;"><i class="ti ti-arrow-left" style="font-size:16px" aria-hidden="true"></i></div>
+            <div style="flex:1;opacity:.5;">
+              <div style="font-family:Georgia,serif;font-style:italic;font-size:22px;font-weight:normal;">January 2026</div>
+              <div style="font-size:12px;color:var(--t2);margin-top:3px;">47 photos · 4 stacks · In progress</div>
+            </div>
+            <div class="mkpill" style="opacity:.5;">
+              <i class="ti ti-check" style="font-size:12px" aria-hidden="true"></i>
+              Mark done
+            </div>
+          </div>
+          <div style="padding:0 16px;opacity:.25;">
+            <div class="si" style="margin-bottom:6px;">
+              <div class="sth"><div class="sth-img" style="background:#6B4B3E;"></div><div class="sbadge">12</div></div>
+              <div class="si-info"><div class="si-t">Jan 8, 10:15 AM – 10:18 AM</div><div class="si-c">12 photos</div></div>
+              <i class="ti ti-arrow-right si-arr" aria-hidden="true"></i>
+            </div>
+            <div class="si">
+              <div class="sth"><div class="sth-img" style="background:#3A5545;"></div><div class="sbadge">18</div></div>
+              <div class="si-info"><div class="si-t">Jan 14, 3:45 PM – 3:52 PM</div><div class="si-c">18 photos</div></div>
+              <i class="ti ti-arrow-right si-arr" aria-hidden="true"></i>
+            </div>
+          </div>
+        </div>
+
+        <div class="bs">
+          <div class="bsh"></div>
+          <div class="bst">Mark as complete?</div>
+          <div class="bsb">January 2026 will be marked complete. You can still cull photos from this period anytime via the Library.</div>
+          <div class="bp">Mark as complete</div>
+          <div class="bqq">Keep culling</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</body>
+</html>

@@ -6,18 +6,14 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.rrajath.occullt.core.datastore.PhotoCache
 import com.rrajath.occullt.core.datastore.SettingsRepository
+import com.rrajath.occullt.core.grouping.PhotoStack
+import com.rrajath.occullt.core.grouping.groupPhotos
 import com.rrajath.occullt.core.model.UnifiedPhotoItem
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
-
-data class PhotoStack(
-    val photos: List<UnifiedPhotoItem>,
-    val startTime: Long,
-    val endTime: Long,
-)
 
 data class StacksState(
     val groups: List<PhotoStack> = emptyList(),
@@ -71,39 +67,6 @@ class StacksViewModel(
         }
     }
 
-    private fun groupPhotos(
-        photos: List<UnifiedPhotoItem>,
-        windowMs: Long,
-    ): List<PhotoStack> {
-        if (photos.size < 2) return emptyList()
-
-        val groups = mutableListOf<MutableList<UnifiedPhotoItem>>()
-        var currentGroup = mutableListOf(photos[0])
-
-        for (i in 1 until photos.size) {
-            val diff = photos[i].dateModified - currentGroup.first().dateModified
-            if (diff <= windowMs) {
-                currentGroup.add(photos[i])
-            } else {
-                if (currentGroup.size >= 2) {
-                    groups.add(currentGroup)
-                }
-                currentGroup = mutableListOf(photos[i])
-            }
-        }
-
-        if (currentGroup.size >= 2) {
-            groups.add(currentGroup)
-        }
-
-        return groups.reversed().map { group ->
-            PhotoStack(
-                photos = group,
-                startTime = group.first().dateModified,
-                endTime = group.last().dateModified,
-            )
-        }
-    }
 }
 
 class StacksViewModelFactory(

@@ -15,6 +15,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
+import com.rrajath.occullt.core.database.WizardSegmentDb
 import com.rrajath.occullt.core.datastore.SettingsRepository
 import com.rrajath.occullt.feature.home.HomeScreen
 import com.rrajath.occullt.feature.library.LibraryScreen
@@ -22,6 +23,9 @@ import com.rrajath.occullt.feature.settings.SettingsScreen
 import com.rrajath.occullt.feature.stacks.StackGridScreen
 import com.rrajath.occullt.feature.stacks.StacksScreen
 import com.rrajath.occullt.feature.viewer.ViewerScreen
+import com.rrajath.occullt.feature.wizard.WizardMonthScreen
+import com.rrajath.occullt.feature.wizard.WizardScreen
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -34,6 +38,10 @@ class SessionViewModel : androidx.lifecycle.ViewModel() {
     var markedIds by mutableStateOf<Set<String>>(emptySet())
     var pinnedId by mutableStateOf<String?>(null)
 
+    // Wizard segment the user is currently culling within; deletions are
+    // attributed to this segment's deleted count
+    var activeWizardMonthKey by mutableStateOf<String?>(null)
+
     private val _reloadTrigger = MutableStateFlow(0)
     val reloadTrigger: StateFlow<Int> = _reloadTrigger.asStateFlow()
 
@@ -44,6 +52,14 @@ class SessionViewModel : androidx.lifecycle.ViewModel() {
     fun saveSession(index: Int, folderUri: String?, settingsRepository: SettingsRepository) {
         viewModelScope.launch {
             settingsRepository.setLastPhotoIndex(index, folderUri ?: "")
+        }
+    }
+
+    fun recordWizardDeletes(context: android.content.Context, deletedCount: Int) {
+        val monthKey = activeWizardMonthKey ?: return
+        if (deletedCount <= 0) return
+        viewModelScope.launch(Dispatchers.IO) {
+            WizardSegmentDb.getInstance(context).incrementDeletedCount(monthKey, deletedCount)
         }
     }
 }
@@ -88,6 +104,38 @@ fun OcculltNavHost(
                 onContinueSession = { index, folderUri ->
                     navController.navigate(Route.Viewer(photoIndex = index, folderUri = folderUri ?: savedFolderUri))
                 },
+                onNavigateToWizard = {
+                    navController.navigate(Route.Wizard)
+                },
+                settingsRepository = settingsRepository
+            )
+        }
+
+        composable<Route.Wizard> {
+            sessionViewModel.activeWizardMonthKey = null
+            WizardScreen(
+                onNavigateBack = {
+                    navController.popBackStack()
+                },
+                onMonthClick = { monthKey ->
+                    navController.navigate(Route.WizardMonth(monthKey = monthKey))
+                },
+                settingsRepository = settingsRepository
+            )
+        }
+
+        composable<Route.WizardMonth> { backStackEntry ->
+            val wizardMonthRoute = backStackEntry.toRoute<Route.WizardMonth>()
+            sessionViewModel.activeWizardMonthKey = wizardMonthRoute.monthKey
+            WizardMonthScreen(
+                monthKey = wizardMonthRoute.monthKey,
+                onNavigateBack = {
+                    navController.popBackStack()
+                },
+                onStackClick = { stackIndex ->
+                    navController.navigate(Route.StackGrid(stackIndex = stackIndex))
+                },
+                reloadTrigger = sessionViewModel.reloadTrigger,
                 settingsRepository = settingsRepository
             )
         }
@@ -136,6 +184,7 @@ fun OcculltNavHost(
 
         composable<Route.Viewer> { backStackEntry ->
             val viewerRoute = backStackEntry.toRoute<Route.Viewer>()
+            val context = androidx.compose.ui.platform.LocalContext.current.applicationContext
             ViewerScreen(
                 photoIndex = viewerRoute.photoIndex,
                 folderUri = viewerRoute.folderUri,
@@ -147,7 +196,8 @@ fun OcculltNavHost(
                     )
                     navController.popBackStack()
                 },
-                onDeleteCompleted = {
+                onDeleteCompleted = { deletedCount ->
+                    sessionViewModel.recordWizardDeletes(context, deletedCount)
                     sessionViewModel.triggerReload()
                     navController.popBackStack()
                 },
