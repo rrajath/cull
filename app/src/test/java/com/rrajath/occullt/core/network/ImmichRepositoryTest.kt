@@ -77,7 +77,9 @@ class ImmichRepositoryTest {
         every { api.getThumbnailUrl(any()) } returns ""
         every { api.getPreviewUrl(any()) } returns ""
         every { api.getOriginalUrl(any()) } returns ""
-        coEvery { api.getAllAssets() } returns Result.failure(Exception("API error"))
+        coEvery {
+            api.searchMetadata(any(), any(), any(), any())
+        } returns Result.failure(Exception("API error"))
 
         val repo = ImmichRepository(api)
         val result = repo.getAllPhotos()
@@ -114,7 +116,11 @@ class ImmichRepositoryTest {
                 thumbhash = null, exifInfo = null,
             ),
         )
-        coEvery { api.getAllAssets() } returns Result.success(assets)
+        coEvery {
+            api.searchMetadata(any(), any(), any(), any())
+        } returns Result.success(
+            ImmichApi.SearchResponse(assets = assets, total = assets.size, hasNextPage = false)
+        )
 
         val repo = ImmichRepository(api)
         val result = repo.getAllPhotos()
@@ -123,6 +129,38 @@ class ImmichRepositoryTest {
         assertEquals(1, photos?.size)
         assertEquals("immich_1", photos?.get(0)?.id)
         assertEquals("photo1", photos?.get(0)?.name)
+    }
+
+    @Test
+    fun `getAllPhotos pages search metadata until hasNextPage is false`() = runTest {
+        val api = mockk<ImmichApi>(relaxUnitFun = true)
+        every { api.getThumbnailUrl(any()) } returns ""
+        every { api.getPreviewUrl(any()) } returns ""
+        every { api.getOriginalUrl(any()) } returns ""
+
+        fun asset(id: String) = ImmichApi.ImmichAsset(
+            id = id, deviceAssetId = "d$id", fileName = "photo$id.jpg",
+            fileCreatedAt = "2024-01-01T00:00:00.000Z",
+            fileModifiedAt = "2024-01-01T00:00:00.000Z",
+            isFavorite = false, isTrashed = false, type = "IMAGE",
+            thumbhash = null, exifInfo = null,
+        )
+
+        coEvery {
+            api.searchMetadata(any(), any(), page = 1, size = any())
+        } returns Result.success(
+            ImmichApi.SearchResponse(assets = listOf(asset("1"), asset("2")), total = 3, hasNextPage = true)
+        )
+        coEvery {
+            api.searchMetadata(any(), any(), page = 2, size = any())
+        } returns Result.success(
+            ImmichApi.SearchResponse(assets = listOf(asset("3")), total = 3, hasNextPage = false)
+        )
+
+        val repo = ImmichRepository(api)
+        val result = repo.getAllPhotos()
+        assertTrue("getAllPhotos failed: ${result.exceptionOrNull()?.message}", result.isSuccess)
+        assertEquals(3, result.getOrNull()?.size)
     }
 
     @Test

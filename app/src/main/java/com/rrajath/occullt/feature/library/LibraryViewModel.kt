@@ -22,7 +22,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
-import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 import java.util.TimeZone
@@ -51,7 +50,11 @@ class LibraryViewModel(
     private val settingsRepository: SettingsRepository,
 ) : ViewModel() {
 
-    private val dateFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US)
+    companion object {
+        private const val EPOCH_START = "1970-01-01T00:00:00.000Z"
+        private const val PAGE_SIZE = 1000
+    }
+
     private val utcDateFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US).apply {
         timeZone = TimeZone.getTimeZone("UTC")
     }
@@ -106,23 +109,23 @@ class LibraryViewModel(
             if (sourceMode == SourceMode.Immich || sourceMode == SourceMode.Hybrid) {
                 val filterStartDateMs = _state.value.filterStartDate
                 val filterEndDateMs = _state.value.filterEndDate
-                val isFiltered = _state.value.isFilterActive
 
+                // Page from the beginning of time via /api/search/metadata;
+                // "load more" advances the page rather than rolling a date window
                 val createdAfterStr = if (filterStartDateMs != null) {
                     utcDateFormat.format(Date(filterStartDateMs))
                 } else {
-                    dateFormat.format(Calendar.getInstance().apply { add(Calendar.DAY_OF_YEAR, -7) }.time)
+                    EPOCH_START
                 }
                 val createdBeforeStr = filterEndDateMs?.let { utcDateFormat.format(Date(it)) }
 
-                val pageSize = if (isFiltered) 1000 else 200
                 val result = unifiedRepo.loadPhotosPaginated(
                     sourceMode = sourceMode,
                     folderUri = folderUri,
                     createdAfter = createdAfterStr,
                     createdBefore = createdBeforeStr,
                     page = 1,
-                    size = pageSize,
+                    size = PAGE_SIZE,
                 )
 
                 if (result.isSuccess) {
@@ -142,9 +145,9 @@ class LibraryViewModel(
                         markedIds = markedIds,
                         pinnedId = pinnedId,
                         sourceMode = sourceMode,
-                        hasMore = if (isFiltered) paginated.hasNextPage else paginated.hasMore,
+                        hasMore = paginated.hasNextPage,
                         createdAfter = createdAfterStr,
-                        createdBefore = paginated.nextCreatedBefore,
+                        createdBefore = createdBeforeStr,
                         filterPage = 1,
                     )
                 } else {
@@ -211,83 +214,42 @@ class LibraryViewModel(
             val unifiedRepo = UnifiedPhotoRepository(context, immichRepo)
             val currentPhotos = _state.value.photos.toMutableList()
 
-            if (_state.value.isFilterActive) {
-                val nextPage = _state.value.filterPage + 1
-                val filterStartDateMs = _state.value.filterStartDate
-                val filterEndDateMs = _state.value.filterEndDate
-                val createdAfterStr = if (filterStartDateMs != null) {
-                    utcDateFormat.format(Date(filterStartDateMs))
-                } else {
-                    return@launch
-                }
-                val createdBeforeStr = filterEndDateMs?.let { utcDateFormat.format(Date(it)) }
+            val nextPage = _state.value.filterPage + 1
+            val filterStartDateMs = _state.value.filterStartDate
+            val filterEndDateMs = _state.value.filterEndDate
 
-                val result = unifiedRepo.loadPhotosPaginated(
-                    sourceMode = sourceMode,
-                    folderUri = folderUri,
-                    createdAfter = createdAfterStr,
-                    createdBefore = createdBeforeStr,
-                    page = nextPage,
-                    size = 1000,
-                )
+            val result = unifiedRepo.loadPhotosPaginated(
+                sourceMode = sourceMode,
+                folderUri = folderUri,
+                createdAfter = _state.value.createdAfter ?: EPOCH_START,
+                createdBefore = _state.value.createdBefore,
+                page = nextPage,
+                size = PAGE_SIZE,
+            )
 
-                if (result.isSuccess) {
-                    val paginated = result.getOrThrow()
-                    var newPhotos = paginated.photos
-                    if (sourceMode == SourceMode.Hybrid) {
-                        newPhotos = newPhotos.filter { photo ->
-                            photo.dateModified >= filterStartDateMs &&
-                            (filterEndDateMs == null || photo.dateModified <= filterEndDateMs)
-                        }
+            if (result.isSuccess) {
+                val paginated = result.getOrThrow()
+                var newPhotos = paginated.photos
+                if (sourceMode == SourceMode.Hybrid && _state.value.isFilterActive) {
+                    newPhotos = newPhotos.filter { photo ->
+                        (filterStartDateMs == null || photo.dateModified >= filterStartDateMs) &&
+                        (filterEndDateMs == null || photo.dateModified <= filterEndDateMs)
                     }
-                    currentPhotos.addAll(newPhotos)
-                    currentPhotos.sortByDescending { it.dateModified }
-
-                    _state.value = _state.value.copy(
-                        photos = currentPhotos,
-                        isLoadingMore = false,
-                        hasMore = paginated.hasNextPage,
-                        filterPage = nextPage,
-                    )
-                } else {
-                    _state.value = _state.value.copy(
-                        isLoadingMore = false,
-                        error = result.exceptionOrNull()?.message ?: "Failed to load more photos"
-                    )
                 }
-            } else {
-                val currentCreatedAfter = _state.value.createdAfter ?: return@launch
+                currentPhotos.addAll(newPhotos)
+                currentPhotos.sortByDescending { it.dateModified }
 
-                val calendar = Calendar.getInstance()
-                calendar.time = dateFormat.parse(currentCreatedAfter) ?: return@launch
-                calendar.add(Calendar.DAY_OF_YEAR, -7)
-                val newCreatedAfter = dateFormat.format(calendar.time)
-
-                val result = unifiedRepo.loadPhotosPaginated(
-                    sourceMode = sourceMode,
-                    folderUri = folderUri,
-                    createdAfter = newCreatedAfter,
-                    createdBefore = currentCreatedAfter,
+                _state.value = _state.value.copy(
+                    photos = currentPhotos,
+                    isLoadingMore = false,
+                    hasMore = paginated.hasNextPage,
+                    filterPage = nextPage,
                 )
-
-                if (result.isSuccess) {
-                    val paginated = result.getOrThrow()
-                    currentPhotos.addAll(paginated.photos)
-                    currentPhotos.sortByDescending { it.dateModified }
-
-                    _state.value = _state.value.copy(
-                        photos = currentPhotos,
-                        isLoadingMore = false,
-                        hasMore = paginated.photos.isNotEmpty(),
-                        createdAfter = newCreatedAfter,
-                        createdBefore = currentCreatedAfter,
-                    )
-                } else {
-                    _state.value = _state.value.copy(
-                        isLoadingMore = false,
-                        error = result.exceptionOrNull()?.message ?: "Failed to load more photos"
-                    )
-                }
+            } else {
+                _state.value = _state.value.copy(
+                    isLoadingMore = false,
+                    error = result.exceptionOrNull()?.message ?: "Failed to load more photos"
+                )
             }
         }
     }

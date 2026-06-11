@@ -4,6 +4,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -347,7 +348,11 @@ class ImmichApi(
                     val assetsGroup = jsonElement["assets"] as? JsonObject
                     val assetsArray = assetsGroup?.get("items") as? JsonArray ?: JsonArray(emptyList())
                     val total = assetsGroup?.get("total")?.jsonPrimitive?.content?.toIntOrNull() ?: 0
-                    val hasNextPage = assetsGroup?.get("hasNextPage")?.jsonPrimitive?.content?.toBoolean() ?: false
+                    // Immich signals more results via "nextPage" (next page number
+                    // as a string, or null on the last page) — there is no
+                    // "hasNextPage" field in the response
+                    val nextPage = assetsGroup?.get("nextPage")
+                    val hasNextPage = nextPage != null && nextPage !is JsonNull
 
                     val assets = assetsArray.mapNotNull { assetJson ->
                         val asset = assetJson as? JsonObject ?: return@mapNotNull null

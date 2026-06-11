@@ -14,6 +14,10 @@ class UnifiedPhotoRepository(
     private val context: Context,
     private val immichRepository: ImmichRepository?,
 ) {
+    companion object {
+        private const val EPOCH_START = "1970-01-01T00:00:00.000Z"
+    }
+
     private val localRepo = LocalPhotoRepository(context)
 
     data class PaginatedResult(
@@ -84,7 +88,7 @@ class UnifiedPhotoRepository(
         createdAfter: String? = null,
         createdBefore: String? = null,
         page: Int = 1,
-        size: Int = 200,
+        size: Int = 1000,
     ): Result<PaginatedResult> = withContext(Dispatchers.IO) {
         try {
             var immichHasMore = false
@@ -92,35 +96,19 @@ class UnifiedPhotoRepository(
             var immichHasNextPage = false
 
             val immichPhotos = if ((sourceMode == SourceMode.Immich || sourceMode == SourceMode.Hybrid) && immichRepository != null) {
-                if (createdAfter == null) {
-                    val sevenDaysAgo = java.util.Calendar.getInstance().apply {
-                        add(java.util.Calendar.DAY_OF_YEAR, -7)
-                    }.time
-                    val createdAfterStr = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", java.util.Locale.US).format(sevenDaysAgo)
-                    val result = immichRepository.searchPhotosByDateRange(
-                        createdAfter = createdAfterStr,
-                        createdBefore = createdBefore,
-                        page = page,
-                        size = size,
-                    )
-                    val paginated = result.getOrNull()
-                    immichHasMore = paginated?.hasMore ?: false
-                    immichNextCreatedBefore = paginated?.nextCreatedBefore
-                    immichHasNextPage = paginated?.hasNextPage ?: false
-                    paginated?.photos.orEmpty()
-                } else {
-                    val result = immichRepository.searchPhotosByDateRange(
-                        createdAfter = createdAfter,
-                        createdBefore = createdBefore,
-                        page = page,
-                        size = size,
-                    )
-                    val paginated = result.getOrNull()
-                    immichHasMore = paginated?.hasMore ?: false
-                    immichNextCreatedBefore = paginated?.nextCreatedBefore
-                    immichHasNextPage = paginated?.hasNextPage ?: false
-                    paginated?.photos.orEmpty()
-                }
+                // No createdAfter means the whole library — page from the epoch
+                // via /api/search/metadata rather than a rolling date window
+                val result = immichRepository.searchPhotosByDateRange(
+                    createdAfter = createdAfter ?: EPOCH_START,
+                    createdBefore = createdBefore,
+                    page = page,
+                    size = size,
+                )
+                val paginated = result.getOrNull()
+                immichHasMore = paginated?.hasMore ?: false
+                immichNextCreatedBefore = paginated?.nextCreatedBefore
+                immichHasNextPage = paginated?.hasNextPage ?: false
+                paginated?.photos.orEmpty()
             } else {
                 emptyList()
             }
@@ -178,6 +166,7 @@ class UnifiedPhotoRepository(
         for (localPhoto in local) {
             val matchingImmich = immichByName[localPhoto.name]
             if (matchingImmich != null) {
+                // Hybrid items keep the local photo's timestamps (incl. dateTaken)
                 result.add(
                     localPhoto.copy(
                         isOnImmich = true,
@@ -263,6 +252,7 @@ private fun com.rrajath.occullt.core.model.PhotoItem.toUnified(source: PhotoSour
         uri = this.uri,
         name = this.name,
         dateModified = this.dateModified,
+        dateTaken = this.dateTaken,
         source = source,
         isOnDevice = true,
         isOnImmich = false,

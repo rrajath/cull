@@ -213,7 +213,7 @@ class ImmichApiMockWebServerTest {
                             }
                         ],
                         "total": 1,
-                        "hasNextPage": false
+                        "nextPage": null
                     }
                 }
             """.trimIndent())
@@ -230,6 +230,36 @@ class ImmichApiMockWebServerTest {
     }
 
     @Test
+    fun searchMetadata_reportsNextPageWhenPresent() = runBlocking {
+        server.enqueue(
+            MockResponse().setResponseCode(200).setBody("""
+                {
+                    "assets": {
+                        "items": [
+                            {
+                                "id": "asset_1",
+                                "deviceAssetId": "device-1",
+                                "originalFileName": "photo1.jpg",
+                                "fileCreatedAt": "2024-01-01T00:00:00.000Z",
+                                "fileModifiedAt": "2024-01-01T00:00:00.000Z",
+                                "isFavorite": false,
+                                "isTrashed": false,
+                                "type": "IMAGE"
+                            }
+                        ],
+                        "total": 2,
+                        "nextPage": "2"
+                    }
+                }
+            """.trimIndent())
+        )
+
+        val result = api.searchMetadata(createdAfter = "2024-01-01T00:00:00.000Z", size = 1)
+        assertTrue(result.isSuccess)
+        assertTrue(result.getOrNull()?.hasNextPage == true)
+    }
+
+    @Test
     fun searchMetadata_handlesEmptyResults() = runBlocking {
         server.enqueue(
             MockResponse().setResponseCode(200).setBody("""
@@ -237,7 +267,7 @@ class ImmichApiMockWebServerTest {
                     "assets": {
                         "items": [],
                         "total": 0,
-                        "hasNextPage": false
+                        "nextPage": null
                     }
                 }
             """.trimIndent())
