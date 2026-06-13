@@ -21,10 +21,19 @@ class ImmichApi(
     baseUrl: String,
     apiKey: String,
 ) {
-    private val client = OkHttpClient.Builder()
-        .connectTimeout(30, TimeUnit.SECONDS)
-        .readTimeout(30, TimeUnit.SECONDS)
-        .build()
+    companion object {
+        // ImmichApi instances are created per screen/load; one shared client keeps
+        // a single connection pool and dispatcher so TLS sessions and HTTP/2
+        // connections are reused instead of re-handshaking on every screen
+        private val sharedClient: OkHttpClient by lazy {
+            OkHttpClient.Builder()
+                .connectTimeout(30, TimeUnit.SECONDS)
+                .readTimeout(30, TimeUnit.SECONDS)
+                .build()
+        }
+    }
+
+    private val client = sharedClient
 
     private val baseUrl: String = baseUrl.trimEnd('/')
 
@@ -200,7 +209,8 @@ class ImmichApi(
     }
 
     fun getPreviewUrl(assetId: String): String {
-        return "$baseUrl/api/assets/$assetId/original"
+        // server-resized preview (~1440p), not the multi-MB original
+        return "$baseUrl/api/assets/$assetId/thumbnail?size=preview"
     }
 
     fun getOriginalUrl(assetId: String): String {

@@ -16,11 +16,13 @@ import com.rrajath.occullt.core.model.UnifiedPhotoItem
 import com.rrajath.occullt.core.network.ImmichApi
 import com.rrajath.occullt.core.network.ImmichRepository
 import com.rrajath.occullt.ui.component.SourceMode
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -64,6 +66,32 @@ class LibraryViewModel(
 
     private var hasLoadedPhotos = false
 
+    // Reused across loadPhotos/loadMorePhotos so the repository's local-scan
+    // cache survives between pages; rebuilt only when the settings change
+    private var cachedRepo: UnifiedPhotoRepository? = null
+    private var cachedRepoKey: String? = null
+
+    private fun obtainRepo(sourceMode: SourceMode, immichUrl: String?, immichApiKey: String?): UnifiedPhotoRepository {
+        val immichEnabled = sourceMode != SourceMode.Local && !immichUrl.isNullOrBlank() && !immichApiKey.isNullOrBlank()
+        OcculltApplication.setImmichApiKey(if (immichEnabled) immichApiKey else null)
+
+        val key = if (immichEnabled) "$immichUrl|$immichApiKey" else "local"
+        cachedRepo?.let { repo ->
+            if (cachedRepoKey == key) return repo
+        }
+
+        val immichRepo = if (immichEnabled) {
+            val mappingDb = ImmichAssetMappingDb.getInstance(context)
+            ImmichRepository(ImmichApi(immichUrl!!, immichApiKey!!), mappingDb)
+        } else {
+            null
+        }
+        return UnifiedPhotoRepository(context, immichRepo).also {
+            cachedRepo = it
+            cachedRepoKey = key
+        }
+    }
+
     fun loadPhotos(forceReload: Boolean = false) {
         if (!forceReload && hasLoadedPhotos && _state.value.photos.isNotEmpty()) {
             _state.value = _state.value.copy(isLoading = false)
@@ -80,16 +108,10 @@ class LibraryViewModel(
             val markedIds = settingsRepository.markedIds.first()
             val pinnedId = settingsRepository.pinnedId.first()
 
-            val immichRepo = if (sourceMode != SourceMode.Local && !immichUrl.isNullOrBlank() && !immichApiKey.isNullOrBlank()) {
-                OcculltApplication.setImmichApiKey(immichApiKey)
-                val mappingDb = ImmichAssetMappingDb.getInstance(context)
-                ImmichRepository(ImmichApi(immichUrl, immichApiKey), mappingDb)
-            } else {
-                OcculltApplication.setImmichApiKey(null)
-                null
+            val unifiedRepo = obtainRepo(sourceMode, immichUrl, immichApiKey)
+            if (forceReload) {
+                unifiedRepo.invalidateLocalCache()
             }
-
-            val unifiedRepo = UnifiedPhotoRepository(context, immichRepo)
 
             if (sourceMode == SourceMode.Local && folderUri.isNullOrBlank()) {
                 val hasPermission = ContextCompat.checkSelfPermission(
@@ -202,17 +224,8 @@ class LibraryViewModel(
             val immichUrl = settingsRepository.immichUrl.first()
             val immichApiKey = settingsRepository.immichApiKey.first()
 
-            val immichRepo = if (sourceMode != SourceMode.Local && !immichUrl.isNullOrBlank() && !immichApiKey.isNullOrBlank()) {
-                OcculltApplication.setImmichApiKey(immichApiKey)
-                val mappingDb = ImmichAssetMappingDb.getInstance(context)
-                ImmichRepository(ImmichApi(immichUrl, immichApiKey), mappingDb)
-            } else {
-                OcculltApplication.setImmichApiKey(null)
-                null
-            }
-
-            val unifiedRepo = UnifiedPhotoRepository(context, immichRepo)
-            val currentPhotos = _state.value.photos.toMutableList()
+            val unifiedRepo = obtainRepo(sourceMode, immichUrl, immichApiKey)
+            val currentPhotos = _state.value.photos
 
             val nextPage = _state.value.filterPage + 1
             val filterStartDateMs = _state.value.filterStartDate
@@ -229,18 +242,20 @@ class LibraryViewModel(
 
             if (result.isSuccess) {
                 val paginated = result.getOrThrow()
-                var newPhotos = paginated.photos
-                if (sourceMode == SourceMode.Hybrid && _state.value.isFilterActive) {
-                    newPhotos = newPhotos.filter { photo ->
-                        (filterStartDateMs == null || photo.dateModified >= filterStartDateMs) &&
-                        (filterEndDateMs == null || photo.dateModified <= filterEndDateMs)
+                // merge + sort of the full list off the main thread
+                val merged = withContext(Dispatchers.Default) {
+                    var newPhotos = paginated.photos
+                    if (sourceMode == SourceMode.Hybrid && _state.value.isFilterActive) {
+                        newPhotos = newPhotos.filter { photo ->
+                            (filterStartDateMs == null || photo.dateModified >= filterStartDateMs) &&
+                            (filterEndDateMs == null || photo.dateModified <= filterEndDateMs)
+                        }
                     }
+                    (currentPhotos + newPhotos).sortedByDescending { it.dateModified }
                 }
-                currentPhotos.addAll(newPhotos)
-                currentPhotos.sortByDescending { it.dateModified }
 
                 _state.value = _state.value.copy(
-                    photos = currentPhotos,
+                    photos = merged,
                     isLoadingMore = false,
                     hasMore = paginated.hasNextPage,
                     filterPage = nextPage,

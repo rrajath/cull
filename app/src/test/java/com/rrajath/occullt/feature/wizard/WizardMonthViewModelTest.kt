@@ -80,6 +80,7 @@ class WizardMonthViewModelTest {
         zone = zone,
         nowMs = { fixedNow },
         ioDispatcher = testDispatcher,
+        defaultDispatcher = testDispatcher,
     )
 
     @Test

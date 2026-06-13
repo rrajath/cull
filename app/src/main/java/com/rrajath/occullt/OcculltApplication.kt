@@ -58,7 +58,8 @@ class OcculltApplication : Application() {
                 .diskCache {
                     DiskCache.Builder()
                         .directory(cacheDir.resolve("image_cache").toOkioPath())
-                        .maxSizePercent(0.02)
+                        // photos stream from Immich; a roomy cache makes revisits instant
+                        .maxSizeBytes(1024L * 1024 * 1024)
                         .build()
                 }
                 .build()

@@ -11,7 +11,6 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -49,6 +48,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -77,7 +77,9 @@ import androidx.compose.ui.unit.sp
 import kotlin.math.abs
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil3.compose.AsyncImage
+import coil3.memory.MemoryCache
 import coil3.request.ImageRequest
+import coil3.request.crossfade
 import com.rrajath.occullt.OcculltApplication
 import com.rrajath.occullt.core.datastore.PhotoCache
 import com.rrajath.occullt.core.datastore.SettingsRepository
@@ -91,10 +93,12 @@ import com.rrajath.occullt.core.network.ImmichRepository
 import com.rrajath.occullt.ui.component.SourceMode
 import com.rrajath.occullt.ui.icon.CullIcons
 import com.rrajath.occullt.ui.theme.ThemeColors
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -115,7 +119,6 @@ fun ViewerScreen(
 
     var photos by remember { mutableStateOf<List<UnifiedPhotoItem>>(emptyList()) }
     var isLoadingPhotos by remember { mutableStateOf(true) }
-    var immichApiKey by remember { mutableStateOf<String?>(null) }
     var longPressThreshold by remember { mutableStateOf(220) }
 
     LaunchedEffect(settingsRepository) {
@@ -132,10 +135,8 @@ fun ViewerScreen(
 
             if (sourceMode != SourceMode.Local && !immichUrl.isNullOrBlank() && !key.isNullOrBlank()) {
                 OcculltApplication.setImmichApiKey(key)
-                immichApiKey = key
             } else {
                 OcculltApplication.setImmichApiKey(null)
-                immichApiKey = null
             }
 
             val cached = PhotoCache.getPhotos()
@@ -201,6 +202,10 @@ fun ViewerScreen(
     val currentPhoto = photos.getOrNull(pagerState.currentPage)
     val isCurrentPinned = currentPhoto?.let { state.pinnedId == it.id } ?: false
 
+    // Cloud-badge lookups answered once per photo; without this every swipe
+    // (including swiping back) re-ran a SQLite query plus a network round-trip
+    val isOnImmichCache = remember { mutableStateMapOf<String, Boolean>() }
+
     LaunchedEffect(pagerState.currentPage) {
         viewModel.setCurrentIndex(pagerState.currentPage)
         viewModel.setLoading(false)
@@ -208,48 +213,32 @@ fun ViewerScreen(
         val currentPhoto = photos.getOrNull(pagerState.currentPage)
         if (currentPhoto != null) {
             viewModel.setIsMarked(state.markedIds.contains(currentPhoto.id))
-            val sourceMode = settingsRepository.sourceMode.first()
 
             when {
-                currentPhoto.isOnImmich -> {
-                    viewModel.setIsOnImmich(true)
-                }
-                sourceMode == SourceMode.Local -> {
-                    val immichUrl = settingsRepository.immichUrl.first()
-                    val immichApiKey = settingsRepository.immichApiKey.first()
-                    if (!immichUrl.isNullOrBlank() && !immichApiKey.isNullOrBlank()) {
-                        launch {
-                            val mappingDb = ImmichAssetMappingDb.getInstance(context)
-                            val mapping = mappingDb.getByFileName(currentPhoto.name)
-                            if (mapping != null) {
-                                val immichApi = ImmichApi(immichUrl, immichApiKey)
-                                val result = immichApi.getAsset(mapping.id)
-                                viewModel.setIsOnImmich(result.isSuccess)
-                            } else {
-                                viewModel.setIsOnImmich(false)
-                            }
-                        }
-                    } else {
-                        viewModel.setIsOnImmich(false)
-                    }
-                }
-                currentPhoto.source == PhotoSource.Immich -> {
+                currentPhoto.isOnImmich || currentPhoto.source == PhotoSource.Immich -> {
                     viewModel.setIsOnImmich(true)
                 }
                 else -> {
+                    val cached = isOnImmichCache[currentPhoto.id]
+                    if (cached != null) {
+                        viewModel.setIsOnImmich(cached)
+                        return@LaunchedEffect
+                    }
                     val immichUrl = settingsRepository.immichUrl.first()
                     val immichApiKey = settingsRepository.immichApiKey.first()
                     if (!immichUrl.isNullOrBlank() && !immichApiKey.isNullOrBlank()) {
                         launch {
-                            val mappingDb = ImmichAssetMappingDb.getInstance(context)
-                            val mapping = mappingDb.getByFileName(currentPhoto.name)
-                            if (mapping != null) {
-                                val immichApi = ImmichApi(immichUrl, immichApiKey)
-                                val result = immichApi.getAsset(mapping.id)
-                                viewModel.setIsOnImmich(result.isSuccess)
-                            } else {
-                                viewModel.setIsOnImmich(false)
+                            val onImmich = withContext(Dispatchers.IO) {
+                                val mappingDb = ImmichAssetMappingDb.getInstance(context)
+                                val mapping = mappingDb.getByFileName(currentPhoto.name)
+                                if (mapping != null) {
+                                    ImmichApi(immichUrl, immichApiKey).getAsset(mapping.id).isSuccess
+                                } else {
+                                    false
+                                }
                             }
+                            isOnImmichCache[currentPhoto.id] = onImmich
+                            viewModel.setIsOnImmich(onImmich)
                         }
                     } else {
                         viewModel.setIsOnImmich(false)
@@ -374,6 +363,8 @@ fun ViewerScreen(
                     scaleX = shrink
                     scaleY = shrink
                 },
+            // pre-compose neighbors so their images are already loading when swiped to
+            beyondViewportPageCount = 1,
             userScrollEnabled = !isCurrentPageZoomed
         ) { page ->
             val photo = photos[page]
@@ -395,7 +386,6 @@ fun ViewerScreen(
                 isOnImmich = state.isOnImmich,
                 showPinnedBadge = isPinned || (state.isLongPressing && state.pinnedId == pinnedPhoto?.id),
                 sourceMode = photos.getOrNull(pagerState.currentPage)?.source ?: PhotoSource.Local,
-                immichApiKey = immichApiKey,
                 longPressThreshold = longPressThreshold,
                 onToggleHud = { viewModel.toggleHud() },
                 onLongPress = {
@@ -614,7 +604,6 @@ private fun ViewerPhotoPage(
     isOnImmich: Boolean?,
     showPinnedBadge: Boolean,
     sourceMode: PhotoSource,
-    immichApiKey: String?,
     onToggleHud: () -> Unit,
     onLongPress: () -> Unit,
     onLongPressRelease: () -> Unit,
@@ -627,11 +616,6 @@ private fun ViewerPhotoPage(
     val colors = ThemeColors.current
 
     val displayPhoto = if (isShowingPinned && pinnedPhoto != null) pinnedPhoto else photo
-
-    val brightness by animateFloatAsState(
-        targetValue = if (isMarked) 0.85f else 1f,
-        label = "brightness"
-    )
 
     val colorMatrix = ColorMatrix().apply { setToSaturation(0f) }
 
@@ -764,25 +748,37 @@ private fun ViewerPhotoPage(
                     }
                 }
         ) {
-            val imageUrl: Any = when (displayPhoto.source) {
+            // Show the server-resized preview immediately; the multi-MB original
+            // is fetched only once the user zooms in. Auth comes from the
+            // x-api-key OkHttp interceptor (same as the grid thumbnails).
+            var wantsOriginal by remember(displayPhoto.id) { mutableStateOf(false) }
+            LaunchedEffect(scale) {
+                if (scale > 1f) wantsOriginal = true
+            }
+
+            val previewUrl = displayPhoto.previewUrl ?: displayPhoto.originalUrl ?: displayPhoto.uri.toString()
+            val imageData: Any = when (displayPhoto.source) {
                 PhotoSource.Local -> displayPhoto.uri
-                PhotoSource.Immich -> {
-                    val base = displayPhoto.originalUrl ?: displayPhoto.previewUrl ?: displayPhoto.uri.toString()
-                    if (!immichApiKey.isNullOrBlank()) {
-                        "$base${if (base.contains("?")) "&" else "?"}apiKey=$immichApiKey"
-                    } else {
-                        base
-                    }
-                }
+                PhotoSource.Immich ->
+                    if (wantsOriginal && displayPhoto.originalUrl != null) displayPhoto.originalUrl!! else previewUrl
+            }
+            // A lower-res version is usually already in Coil's memory cache
+            // (grid thumbnail, or the preview when upgrading to the original) —
+            // show it instantly instead of a black screen + spinner
+            val placeholderKey = when (displayPhoto.source) {
+                PhotoSource.Local -> displayPhoto.uri.toString()
+                PhotoSource.Immich -> if (wantsOriginal) previewUrl else displayPhoto.thumbnailUrl
             }
 
             AsyncImage(
                 model = ImageRequest.Builder(LocalContext.current)
-                    .data(imageUrl)
+                    .data(imageData)
+                    .placeholderMemoryCacheKey(placeholderKey?.let { MemoryCache.Key(it) })
+                    .crossfade(150)
                     .listener(
                         onSuccess = { _, _ -> onLoadingChanged(false) },
                         onError = { _, result ->
-                            android.util.Log.e("ViewerPhotoPage", "Failed to load image: $imageUrl, error: ${result.throwable?.message}")
+                            android.util.Log.e("ViewerPhotoPage", "Failed to load image: $imageData, error: ${result.throwable?.message}")
                             onLoadingChanged(false)
                         }
                     )

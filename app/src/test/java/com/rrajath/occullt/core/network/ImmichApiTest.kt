@@ -1,6 +1,7 @@
 package com.rrajath.occullt.core.network
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotEquals
 import org.junit.Test
 
 class ImmichApiTest {
@@ -16,7 +17,7 @@ class ImmichApiTest {
     fun `getPreviewUrl constructs correct URL`() {
         val api = ImmichApi("https://immich.example.com", "test-key")
         val url = api.getPreviewUrl("asset_123")
-        assertEquals("https://immich.example.com/api/assets/asset_123/original", url)
+        assertEquals("https://immich.example.com/api/assets/asset_123/thumbnail?size=preview", url)
     }
 
     @Test
@@ -50,8 +51,8 @@ class ImmichApiTest {
     }
 
     @Test
-    fun `getPreviewUrl and getOriginalUrl return same URL`() {
+    fun `getPreviewUrl returns the server-resized preview, not the original`() {
         val api = ImmichApi("https://immich.example.com", "test-key")
-        assertEquals(api.getPreviewUrl("asset_1"), api.getOriginalUrl("asset_1"))
+        assertNotEquals(api.getPreviewUrl("asset_1"), api.getOriginalUrl("asset_1"))
     }
 }

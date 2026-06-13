@@ -4,8 +4,8 @@ import android.content.ContentUris
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.provider.DocumentsContract
 import android.provider.MediaStore
-import androidx.documentfile.provider.DocumentFile
 import com.rrajath.occullt.core.model.PhotoItem
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -20,30 +20,41 @@ class LocalPhotoRepository(private val context: Context) {
     }
 
     suspend fun getPhotosFromFolder(folderUri: Uri): List<PhotoItem> = withContext(Dispatchers.IO) {
-        val directory = DocumentFile.fromTreeUri(context, folderUri) ?: return@withContext emptyList()
-        val imageExtensions = setOf("jpg", "jpeg", "png", "webp", "heic", "heif", "bmp", "gif")
-
+        // One DocumentsContract children query instead of DocumentFile.listFiles()
+        // plus per-file isFile/name/lastModified calls — each of those is a separate
+        // Binder IPC, which made large folders take seconds to list
+        val treeDocId = DocumentsContract.getTreeDocumentId(folderUri)
+        val childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(folderUri, treeDocId)
         val photos = mutableListOf<PhotoItem>()
-        val files = directory.listFiles()
-        files.forEach { file ->
-            if (file.isFile && file.exists()) {
-                val name = file.name ?: ""
-                val extension = name.substringAfterLast('.', "").lowercase()
-                if (extension in imageExtensions) {
-                    file.uri?.let { uri ->
-                        // SAF gives no cheap EXIF access; lastModified is the date-taken fallback
-                        val lastModified = file.lastModified()
-                        photos.add(
-                            PhotoItem(
-                                id = name,
-                                uri = uri,
-                                name = name,
-                                dateModified = lastModified,
-                                dateTaken = lastModified
-                            )
-                        )
-                    }
-                }
+        val projection = arrayOf(
+            DocumentsContract.Document.COLUMN_DOCUMENT_ID,
+            DocumentsContract.Document.COLUMN_DISPLAY_NAME,
+            DocumentsContract.Document.COLUMN_LAST_MODIFIED,
+            DocumentsContract.Document.COLUMN_MIME_TYPE,
+        )
+
+        context.contentResolver.query(childrenUri, projection, null, null, null)?.use { cursor ->
+            val idColumn = cursor.getColumnIndexOrThrow(DocumentsContract.Document.COLUMN_DOCUMENT_ID)
+            val nameColumn = cursor.getColumnIndexOrThrow(DocumentsContract.Document.COLUMN_DISPLAY_NAME)
+            val modifiedColumn = cursor.getColumnIndexOrThrow(DocumentsContract.Document.COLUMN_LAST_MODIFIED)
+            val mimeColumn = cursor.getColumnIndexOrThrow(DocumentsContract.Document.COLUMN_MIME_TYPE)
+
+            while (cursor.moveToNext()) {
+                val mimeType = cursor.getString(mimeColumn) ?: continue
+                if (!mimeType.startsWith("image/")) continue
+                val name = cursor.getString(nameColumn) ?: ""
+                // SAF gives no cheap EXIF access; lastModified is the date-taken fallback
+                val lastModified = cursor.getLong(modifiedColumn)
+                val uri = DocumentsContract.buildDocumentUriUsingTree(folderUri, cursor.getString(idColumn))
+                photos.add(
+                    PhotoItem(
+                        id = name,
+                        uri = uri,
+                        name = name,
+                        dateModified = lastModified,
+                        dateTaken = lastModified
+                    )
+                )
             }
         }
 

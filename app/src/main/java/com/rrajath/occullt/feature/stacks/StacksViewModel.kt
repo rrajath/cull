@@ -9,11 +9,14 @@ import com.rrajath.occullt.core.datastore.SettingsRepository
 import com.rrajath.occullt.core.grouping.PhotoStack
 import com.rrajath.occullt.core.grouping.groupPhotos
 import com.rrajath.occullt.core.model.UnifiedPhotoItem
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 data class StacksState(
     val groups: List<PhotoStack> = emptyList(),
@@ -28,6 +31,7 @@ object PhotoStackCache {
 class StacksViewModel(
     private val context: Context,
     private val settingsRepository: SettingsRepository,
+    private val defaultDispatcher: CoroutineDispatcher = Dispatchers.Default,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(StacksState())
@@ -51,8 +55,11 @@ class StacksViewModel(
                     return@collectLatest
                 }
 
-                val sorted = photos.sortedBy { it.dateModified }
-                val groups = groupPhotos(sorted, windowMs)
+                // sorting + grouping the full library can take tens of ms —
+                // keep it off the main thread so screen entry doesn't drop frames
+                val groups = withContext(defaultDispatcher) {
+                    groupPhotos(photos.sortedBy { it.dateModified }, windowMs)
+                }
 
                 PhotoStackCache.stacks = groups.mapIndexed { index, stack ->
                     index to stack.photos

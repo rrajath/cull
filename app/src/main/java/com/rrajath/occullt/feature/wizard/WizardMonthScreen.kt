@@ -191,10 +191,13 @@ fun WizardMonthScreen(
                         items = state.stacks,
                         key = { index, _ -> "stack_$index" }
                     ) { index, stack ->
+                        // hashing all photo ids is not free — compute once per stack,
+                        // not on every recomposition
+                        val key = remember(stack) { stackKey(stack.photos) }
                         StackCard(
                             stack = stack,
                             onClick = { onStackClick(index) },
-                            isDone = doneKeys.contains(stackKey(stack.photos))
+                            isDone = doneKeys.contains(key)
                         )
                     }
                 }

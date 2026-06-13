@@ -41,6 +41,7 @@ class WizardMonthViewModel(
     private val zone: ZoneId = ZoneId.systemDefault(),
     private val nowMs: () -> Long = System::currentTimeMillis,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
+    private val defaultDispatcher: CoroutineDispatcher = Dispatchers.Default,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(
@@ -102,14 +103,18 @@ class WizardMonthViewModel(
                 )
             }
 
-            val (monthStart, monthEnd) = WizardSegmentation.monthBounds(monthKey, zone)
-            val monthPhotos = photos.filter { it.dateTaken in monthStart until monthEnd }
-            monthPhotoIds = monthPhotos.map { it.id }.toSet()
-
             val windowMinutes = settingsRepository.groupingWindowMinutes.first()
             val windowMs = windowMinutes * 60 * 1000L
-            val sorted = monthPhotos.sortedBy { it.dateTaken }
-            val stacks = groupPhotos(sorted, windowMs) { it.dateTaken }
+
+            // filter + sort + group off the main thread so the screen's entry
+            // animation doesn't drop frames on large libraries
+            val (monthPhotos, stacks) = withContext(defaultDispatcher) {
+                val (monthStart, monthEnd) = WizardSegmentation.monthBounds(monthKey, zone)
+                val filtered = photos.filter { it.dateTaken in monthStart until monthEnd }
+                val grouped = groupPhotos(filtered.sortedBy { it.dateTaken }, windowMs) { it.dateTaken }
+                filtered to grouped
+            }
+            monthPhotoIds = monthPhotos.map { it.id }.toSet()
 
             PhotoStackCache.stacks = stacks.mapIndexed { index, stack ->
                 index to stack.photos

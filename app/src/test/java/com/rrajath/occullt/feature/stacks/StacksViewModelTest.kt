@@ -50,7 +50,7 @@ class StacksViewModelTest {
 
     @Test
     fun `loadGroups with empty cache shows empty state`() = runTest {
-        val viewModel = StacksViewModel(context, settingsRepository)
+        val viewModel = StacksViewModel(context, settingsRepository, testDispatcher)
         viewModel.loadGroups()
         advanceUntilIdle()
         val state = viewModel.state.value
@@ -69,7 +69,7 @@ class StacksViewModelTest {
                 )
             )
         )
-        val viewModel = StacksViewModel(context, settingsRepository)
+        val viewModel = StacksViewModel(context, settingsRepository, testDispatcher)
         viewModel.loadGroups()
         advanceUntilIdle()
         val state = viewModel.state.value
@@ -92,7 +92,7 @@ class StacksViewModelTest {
                 ),
             )
         )
-        val viewModel = StacksViewModel(context, settingsRepository)
+        val viewModel = StacksViewModel(context, settingsRepository, testDispatcher)
         viewModel.loadGroups()
         advanceUntilIdle()
         val state = viewModel.state.value
@@ -119,7 +119,7 @@ class StacksViewModelTest {
                 ),
             )
         )
-        val viewModel = StacksViewModel(context, settingsRepository)
+        val viewModel = StacksViewModel(context, settingsRepository, testDispatcher)
         viewModel.loadGroups()
         advanceUntilIdle()
         val state = viewModel.state.value
@@ -157,7 +157,7 @@ class StacksViewModelTest {
                 ),
             )
         )
-        val viewModel = StacksViewModel(context, settingsRepository)
+        val viewModel = StacksViewModel(context, settingsRepository, testDispatcher)
         viewModel.loadGroups()
         advanceUntilIdle()
         val state = viewModel.state.value
@@ -181,7 +181,7 @@ class StacksViewModelTest {
                 ),
             )
         )
-        val viewModel = StacksViewModel(context, settingsRepository)
+        val viewModel = StacksViewModel(context, settingsRepository, testDispatcher)
         viewModel.loadGroups()
         advanceUntilIdle()
         assertFalse(PhotoStackCache.stacks.isEmpty())
@@ -206,7 +206,7 @@ class StacksViewModelTest {
                 ),
             )
         )
-        val viewModel = StacksViewModel(context, settingsRepository)
+        val viewModel = StacksViewModel(context, settingsRepository, testDispatcher)
         viewModel.loadGroups()
         advanceUntilIdle()
         val state = viewModel.state.value
@@ -228,7 +228,7 @@ class StacksViewModelTest {
                 ),
             )
         )
-        val viewModel = StacksViewModel(context, settingsRepository)
+        val viewModel = StacksViewModel(context, settingsRepository, testDispatcher)
         viewModel.loadGroups()
         advanceUntilIdle()
         val stack = viewModel.state.value.groups[0]
@@ -245,7 +245,7 @@ class StacksViewModelTest {
             )
         }
         PhotoCache.setPhotos(photos)
-        val viewModel = StacksViewModel(context, settingsRepository)
+        val viewModel = StacksViewModel(context, settingsRepository, testDispatcher)
         viewModel.loadGroups()
         advanceUntilIdle()
         val state = viewModel.state.value

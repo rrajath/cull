@@ -20,6 +20,31 @@ class UnifiedPhotoRepository(
 
     private val localRepo = LocalPhotoRepository(context)
 
+    // The device library doesn't change between paginated loads, so the scan
+    // (MediaStore query or SAF folder listing) runs once per repository instance
+    // instead of once per "Load More" page
+    private var cachedLocalPhotos: List<UnifiedPhotoItem>? = null
+    private var cachedLocalFolderUri: String? = null
+
+    fun invalidateLocalCache() {
+        cachedLocalPhotos = null
+        cachedLocalFolderUri = null
+    }
+
+    private suspend fun loadLocalUnified(folderUri: String?): List<UnifiedPhotoItem> {
+        cachedLocalPhotos?.let { cached ->
+            if (cachedLocalFolderUri == folderUri) return cached
+        }
+        val fresh = if (folderUri.isNullOrBlank() || (folderUri.contains("DCIM") && folderUri.contains("Camera"))) {
+            localRepo.loadCameraPhotosFromMediaStore(context).map { it.toUnified(PhotoSource.Local) }
+        } else {
+            localRepo.getPhotosFromFolder(Uri.parse(folderUri)).map { it.toUnified(PhotoSource.Local) }
+        }
+        cachedLocalPhotos = fresh
+        cachedLocalFolderUri = folderUri
+        return fresh
+    }
+
     data class PaginatedResult(
         val photos: List<UnifiedPhotoItem>,
         val hasMore: Boolean,
@@ -39,13 +64,7 @@ class UnifiedPhotoRepository(
     ): Result<List<UnifiedPhotoItem>> = withContext(Dispatchers.IO) {
         try {
             if (sourceMode == SourceMode.Local) {
-                val localPhotos = if (folderUri.isNullOrBlank() || folderUri.contains("DCIM") && folderUri.contains("Camera")) {
-                    localRepo.loadCameraPhotosFromMediaStore(context).map { it.toUnified(PhotoSource.Local) }
-                } else {
-                    val uri = Uri.parse(folderUri)
-                    localRepo.getPhotosFromFolder(uri).map { it.toUnified(PhotoSource.Local) }
-                }
-                return@withContext Result.success(localPhotos)
+                return@withContext Result.success(loadLocalUnified(folderUri))
             }
 
             if (sourceMode == SourceMode.Immich) {
@@ -59,12 +78,7 @@ class UnifiedPhotoRepository(
                 return@withContext Result.success(immichPhotos)
             }
 
-            val localPhotos = if (folderUri.isNullOrBlank() || (folderUri.contains("DCIM") && folderUri.contains("Camera"))) {
-                localRepo.loadCameraPhotosFromMediaStore(context).map { it.toUnified(PhotoSource.Local) }
-            } else {
-                val uri = Uri.parse(folderUri)
-                localRepo.getPhotosFromFolder(uri).map { it.toUnified(PhotoSource.Local) }
-            }
+            val localPhotos = loadLocalUnified(folderUri)
 
             val immichPhotos = when {
                 immichRepository == null -> emptyList()
@@ -124,18 +138,7 @@ class UnifiedPhotoRepository(
                 )
             }
 
-            val localPhotos = if (folderUri.isNullOrBlank() || (folderUri.contains("DCIM") && folderUri.contains("Camera"))) {
-                val t1 = System.currentTimeMillis()
-                val result = localRepo.loadCameraPhotosFromMediaStore(context)
-                android.util.Log.d("LibraryPerf", "MediaStore path took ${System.currentTimeMillis() - t1}ms")
-                result.map { it.toUnified(PhotoSource.Local) }
-            } else {
-                val t1 = System.currentTimeMillis()
-                val uri = Uri.parse(folderUri)
-                val result = localRepo.getPhotosFromFolder(uri)
-                android.util.Log.d("LibraryPerf", "DocumentFile path took ${System.currentTimeMillis() - t1}ms")
-                result.map { it.toUnified(PhotoSource.Local) }
-            }
+            val localPhotos = loadLocalUnified(folderUri)
 
             val hybridPhotos = if (sourceMode == SourceMode.Hybrid) {
                 intersectPhotoLists(localPhotos, immichPhotos)
