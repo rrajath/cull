@@ -18,3 +18,12 @@ TOKEN_USAGE.md
 .understand-anything
 .claude/settings.local.json
 .serena
+
+# Sentry Config File
+sentry.properties
+
+# Release signing keystore - never commit
+*.jks
+*.keystore
+
+PROGRESS.md
