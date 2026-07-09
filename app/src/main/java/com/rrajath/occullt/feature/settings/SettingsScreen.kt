@@ -1,6 +1,7 @@
 package com.rrajath.occullt.feature.settings
 
 import android.content.Intent
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -43,9 +44,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.rrajath.occullt.core.datastore.SettingsExport
 import com.rrajath.occullt.core.datastore.SettingsRepository
 import com.rrajath.occullt.core.network.ImmichApi
 import com.rrajath.occullt.ui.component.CircleIcon
+import com.rrajath.occullt.ui.component.Div
 import com.rrajath.occullt.ui.component.SectionLabel
 import com.rrajath.occullt.ui.component.SliderRow
 import com.rrajath.occullt.ui.component.SourceMode
@@ -55,6 +58,9 @@ import com.rrajath.occullt.ui.theme.CatppuccinAccents
 import com.rrajath.occullt.ui.theme.ThemeColors
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
+import kotlinx.serialization.decodeFromString
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 
 enum class ConnectionState {
     NotTested,
@@ -169,6 +175,44 @@ fun SettingsScreen(
                     it,
                     Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
                 )
+            }
+        }
+    }
+
+    val exportLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("application/json")
+    ) { uri ->
+        uri?.let {
+            scope.launch {
+                try {
+                    val export = settingsRepository.exportSettings()
+                    val json = Json { prettyPrint = true }.encodeToString(export)
+                    context.contentResolver.openOutputStream(it)?.use { stream ->
+                        stream.write(json.toByteArray())
+                    }
+                    Toast.makeText(context, "Settings exported", Toast.LENGTH_SHORT).show()
+                } catch (e: Exception) {
+                    Toast.makeText(context, "Export failed: ${e.message}", Toast.LENGTH_LONG).show()
+                }
+            }
+        }
+    }
+
+    val importLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        uri?.let {
+            scope.launch {
+                try {
+                    val json = context.contentResolver.openInputStream(it)?.use { stream ->
+                        stream.bufferedReader().readText()
+                    } ?: throw IllegalStateException("Could not read file")
+                    val export = Json { ignoreUnknownKeys = true }.decodeFromString<SettingsExport>(json)
+                    settingsRepository.importSettings(export)
+                    Toast.makeText(context, "Settings imported", Toast.LENGTH_SHORT).show()
+                } catch (e: Exception) {
+                    Toast.makeText(context, "Import failed: ${e.message}", Toast.LENGTH_LONG).show()
+                }
             }
         }
     }
@@ -521,6 +565,66 @@ fun SettingsScreen(
                                         }
                                 )
                             }
+                        }
+                    }
+                }
+            }
+
+            Section(text = "Import / Export") {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(colors.bgElev)
+                        .border(1.dp, colors.line, RoundedCornerShape(14.dp)),
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { exportLauncher.launch("cull.settings.json") }
+                            .padding(16.dp)
+                    ) {
+                        Column {
+                            Text(
+                                text = "Export Settings",
+                                style = androidx.compose.material3.MaterialTheme.typography.labelLarge.copy(
+                                    color = colors.fg,
+                                    fontSize = 14.sp
+                                )
+                            )
+                            Text(
+                                text = "Save settings to a JSON file (excludes API key)",
+                                style = androidx.compose.material3.MaterialTheme.typography.labelLarge.copy(
+                                    color = colors.fgFaint,
+                                    fontSize = 12.sp
+                                ),
+                                modifier = Modifier.padding(top = 4.dp)
+                            )
+                        }
+                    }
+                    Div()
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { importLauncher.launch(arrayOf("application/json")) }
+                            .padding(16.dp)
+                    ) {
+                        Column {
+                            Text(
+                                text = "Import Settings",
+                                style = androidx.compose.material3.MaterialTheme.typography.labelLarge.copy(
+                                    color = colors.fg,
+                                    fontSize = 14.sp
+                                )
+                            )
+                            Text(
+                                text = "Load settings from a previously exported JSON file",
+                                style = androidx.compose.material3.MaterialTheme.typography.labelLarge.copy(
+                                    color = colors.fgFaint,
+                                    fontSize = 12.sp
+                                ),
+                                modifier = Modifier.padding(top = 4.dp)
+                            )
                         }
                     }
                 }

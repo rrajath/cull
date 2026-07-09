@@ -11,6 +11,7 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.rrajath.occullt.ui.component.SourceMode
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 
 private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "settings")
@@ -195,6 +196,35 @@ class SettingsRepository(context: Context) {
     suspend fun setGroupingWindowMinutes(minutes: Int) {
         dataStore.edit { prefs ->
             prefs[Keys.GROUPING_WINDOW_MINUTES] = minutes
+        }
+    }
+
+    suspend fun exportSettings(): SettingsExport {
+        val prefs = dataStore.data.first()
+        return SettingsExport(
+            sourceMode = prefs[Keys.SOURCE_MODE] ?: SourceMode.Hybrid.name,
+            immichUrl = prefs[Keys.IMMICH_URL],
+            longPressThresholdMs = prefs[Keys.LONG_PRESS_THRESHOLD] ?: 220,
+            dryRun = prefs[Keys.DRY_RUN] ?: false,
+            mirrorDeletes = prefs[Keys.MIRROR_DELETES] ?: false,
+            darkTheme = prefs[Keys.DARK_THEME] ?: true,
+            accentHue = prefs[Keys.ACCENT_HUE] ?: 0,
+            groupingWindowMinutes = prefs[Keys.GROUPING_WINDOW_MINUTES] ?: 2,
+        )
+    }
+
+    suspend fun importSettings(export: SettingsExport) {
+        dataStore.edit { prefs ->
+            prefs[Keys.SOURCE_MODE] = export.sourceMode
+            if (export.immichUrl != null) {
+                prefs[Keys.IMMICH_URL] = export.immichUrl
+            }
+            prefs[Keys.LONG_PRESS_THRESHOLD] = export.longPressThresholdMs
+            prefs[Keys.DRY_RUN] = export.dryRun
+            prefs[Keys.MIRROR_DELETES] = export.mirrorDeletes
+            prefs[Keys.DARK_THEME] = export.darkTheme
+            prefs[Keys.ACCENT_HUE] = export.accentHue
+            prefs[Keys.GROUPING_WINDOW_MINUTES] = export.groupingWindowMinutes
         }
     }
 }
