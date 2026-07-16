@@ -164,6 +164,7 @@ fun OcculltNavHost(
                 onStackClick = { stackIndex ->
                     navController.navigate(Route.StackGrid(stackIndex = stackIndex))
                 },
+                reloadTrigger = sessionViewModel.reloadTrigger,
                 settingsRepository = settingsRepository
             )
         }
@@ -178,6 +179,7 @@ fun OcculltNavHost(
                 onPhotoClick = { index, folderUri ->
                     navController.navigate(Route.Viewer(photoIndex = index, folderUri = folderUri))
                 },
+                reloadTrigger = sessionViewModel.reloadTrigger,
                 settingsRepository = settingsRepository
             )
         }

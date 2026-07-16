@@ -15,6 +15,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -26,6 +27,11 @@ data class StacksState(
 
 object PhotoStackCache {
     var stacks: Map<Int, List<UnifiedPhotoItem>> = emptyMap()
+
+    fun removePhotos(ids: Set<String>) {
+        if (ids.isEmpty()) return
+        stacks = stacks.mapValues { (_, photos) -> photos.filterNot { ids.contains(it.id) } }
+    }
 }
 
 class StacksViewModel(
@@ -38,10 +44,15 @@ class StacksViewModel(
     val state: StateFlow<StacksState> = _state.asStateFlow()
 
     private var cachedPhotos: List<UnifiedPhotoItem>? = null
+    private var lastHandledReloadTrigger = 0
+    private val _internalReload = MutableStateFlow(0)
 
     fun loadGroups() {
         viewModelScope.launch {
-            settingsRepository.groupingWindowMinutes.collectLatest { windowMinutes ->
+            combine(
+                settingsRepository.groupingWindowMinutes,
+                _internalReload
+            ) { windowMinutes, _ -> windowMinutes }.collectLatest { windowMinutes ->
                 _state.value = StacksState(isLoading = true)
 
                 val windowMs = windowMinutes * 60 * 1000L
@@ -72,6 +83,16 @@ class StacksViewModel(
                 )
             }
         }
+    }
+
+    /** Called when the global reload trigger fires (e.g. after a delete). */
+    fun onReloadTrigger(triggerValue: Int) {
+        if (triggerValue <= lastHandledReloadTrigger) return
+        lastHandledReloadTrigger = triggerValue
+        // photos deleted since the last load were already scrubbed from
+        // PhotoCache by the deleting screen — re-pull and regroup
+        cachedPhotos = null
+        _internalReload.value++
     }
 
 }

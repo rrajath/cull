@@ -90,6 +90,7 @@ import com.rrajath.occullt.core.model.PhotoSource
 import com.rrajath.occullt.core.model.UnifiedPhotoItem
 import com.rrajath.occullt.core.network.ImmichApi
 import com.rrajath.occullt.core.network.ImmichRepository
+import com.rrajath.occullt.feature.stacks.PhotoStackCache
 import com.rrajath.occullt.ui.component.SourceMode
 import com.rrajath.occullt.ui.icon.CullIcons
 import com.rrajath.occullt.ui.theme.ThemeColors
@@ -529,6 +530,13 @@ fun ViewerScreen(
                             deleteSummary = result.getOrNull()
                             // photo count, not local+immich sum (hybrid photos exist in both)
                             deletedPhotoCount = photosToDelete.size
+
+                            // scrub deleted photos from the shared caches so the
+                            // stacks/burst screens don't keep showing them
+                            val deletedIds = photosToDelete.map { it.id }.toSet()
+                            PhotoCache.removePhotos(deletedIds)
+                            PhotoStackCache.removePhotos(deletedIds)
+                            photos = photos.filterNot { deletedIds.contains(it.id) }
                         }
 
                         delay(800)

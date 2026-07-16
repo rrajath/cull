@@ -79,6 +79,36 @@ class PhotoCacheTest {
     }
 
     @Test
+    fun `removePhotos filters out matching ids`() {
+        PhotoCache.setPhotos(photos)
+        PhotoCache.removePhotos(setOf("1"))
+        val result = PhotoCache.getPhotos()
+        assertEquals(1, result?.size)
+        assertEquals("2", result?.get(0)?.id)
+    }
+
+    @Test
+    fun `removePhotos with unknown id is a no-op`() {
+        PhotoCache.setPhotos(photos)
+        PhotoCache.removePhotos(setOf("unknown"))
+        assertEquals(2, PhotoCache.getPhotos()?.size)
+    }
+
+    @Test
+    fun `removePhotos with empty set is a no-op`() {
+        PhotoCache.setPhotos(photos)
+        PhotoCache.removePhotos(emptySet())
+        assertEquals(2, PhotoCache.getPhotos()?.size)
+    }
+
+    @Test
+    fun `removePhotos removing all photos returns null from getPhotos`() {
+        PhotoCache.setPhotos(photos)
+        PhotoCache.removePhotos(setOf("1", "2"))
+        assertNull(PhotoCache.getPhotos())
+    }
+
+    @Test
     fun `getPhotos preserves photo data`() {
         PhotoCache.setPhotos(photos)
         val result = PhotoCache.getPhotos()
