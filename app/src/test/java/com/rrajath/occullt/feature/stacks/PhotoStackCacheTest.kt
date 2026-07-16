@@ -52,4 +52,30 @@ class PhotoStackCacheTest {
         )
         assertEquals(2, PhotoStackCache.stacks.size)
     }
+
+    @Test
+    fun `removePhotos scrubs matching ids from every stack`() {
+        PhotoStackCache.stacks = mapOf(
+            0 to listOf(
+                UnifiedPhotoItem(id = "a", uri = mockUri, name = "a.jpg"),
+                UnifiedPhotoItem(id = "b", uri = mockUri, name = "b.jpg"),
+            ),
+            1 to listOf(
+                UnifiedPhotoItem(id = "c", uri = mockUri, name = "c.jpg"),
+            ),
+        )
+        PhotoStackCache.removePhotos(setOf("b", "c"))
+        assertEquals(1, PhotoStackCache.stacks[0]?.size)
+        assertEquals("a", PhotoStackCache.stacks[0]?.get(0)?.id)
+        assertTrue(PhotoStackCache.stacks[1].orEmpty().isEmpty())
+    }
+
+    @Test
+    fun `removePhotos with empty set is a no-op`() {
+        PhotoStackCache.stacks = mapOf(
+            0 to listOf(UnifiedPhotoItem(id = "a", uri = mockUri, name = "a.jpg"))
+        )
+        PhotoStackCache.removePhotos(emptySet())
+        assertEquals(1, PhotoStackCache.stacks[0]?.size)
+    }
 }

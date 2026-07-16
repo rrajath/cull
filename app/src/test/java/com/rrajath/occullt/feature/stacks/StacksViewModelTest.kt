@@ -252,4 +252,62 @@ class StacksViewModelTest {
         assertEquals(1, state.groups.size)
         assertEquals(5, state.groups[0].photos.size)
     }
+
+    @Test
+    fun `onReloadTrigger re-pulls PhotoCache after a deletion`() = runTest {
+        PhotoCache.setPhotos(
+            listOf(
+                UnifiedPhotoItem(
+                    id = "1", uri = mockUri, name = "photo1.jpg",
+                    dateModified = 1000L, source = PhotoSource.Local
+                ),
+                UnifiedPhotoItem(
+                    id = "2", uri = mockUri, name = "photo2.jpg",
+                    dateModified = 2000L, source = PhotoSource.Local
+                ),
+            )
+        )
+        val viewModel = StacksViewModel(context, settingsRepository, testDispatcher)
+        viewModel.loadGroups()
+        advanceUntilIdle()
+        assertEquals(1, viewModel.state.value.groups.size)
+        assertEquals(2, viewModel.state.value.groups[0].photos.size)
+
+        // simulate a delete: the deleting screen scrubs PhotoCache directly,
+        // then bumps the shared reload trigger
+        PhotoCache.removePhotos(setOf("2"))
+        viewModel.onReloadTrigger(1)
+        advanceUntilIdle()
+
+        assertEquals(1, viewModel.state.value.groups[0].photos.size)
+        assertEquals("1", viewModel.state.value.groups[0].photos[0].id)
+    }
+
+    @Test
+    fun `onReloadTrigger ignores stale or repeated trigger values`() = runTest {
+        PhotoCache.setPhotos(
+            listOf(
+                UnifiedPhotoItem(
+                    id = "1", uri = mockUri, name = "photo1.jpg",
+                    dateModified = 1000L, source = PhotoSource.Local
+                ),
+                UnifiedPhotoItem(
+                    id = "2", uri = mockUri, name = "photo2.jpg",
+                    dateModified = 2000L, source = PhotoSource.Local
+                ),
+            )
+        )
+        val viewModel = StacksViewModel(context, settingsRepository, testDispatcher)
+        viewModel.loadGroups()
+        advanceUntilIdle()
+
+        viewModel.onReloadTrigger(1)
+        advanceUntilIdle()
+        PhotoCache.removePhotos(setOf("2"))
+        // repeated/stale value should not force a re-pull
+        viewModel.onReloadTrigger(1)
+        advanceUntilIdle()
+
+        assertEquals(2, viewModel.state.value.groups[0].photos.size)
+    }
 }

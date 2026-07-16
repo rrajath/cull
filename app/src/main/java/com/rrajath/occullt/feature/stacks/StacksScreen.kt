@@ -33,11 +33,13 @@ import com.rrajath.occullt.ui.component.CircleIcon
 import com.rrajath.occullt.ui.component.StackCard
 import com.rrajath.occullt.ui.icon.CullIcons
 import com.rrajath.occullt.ui.theme.ThemeColors
+import kotlinx.coroutines.flow.StateFlow
 
 @Composable
 fun StacksScreen(
     onNavigateBack: () -> Unit,
     onStackClick: (Int) -> Unit,
+    reloadTrigger: StateFlow<Int>,
     settingsRepository: SettingsRepository,
     modifier: Modifier = Modifier,
 ) {
@@ -50,6 +52,12 @@ fun StacksScreen(
 
     LaunchedEffect(Unit) {
         viewModel.loadGroups()
+    }
+
+    LaunchedEffect(Unit) {
+        reloadTrigger.collect { value ->
+            if (value > 0) viewModel.onReloadTrigger(value)
+        }
     }
 
     Column(

@@ -13,6 +13,11 @@ object PhotoCache {
         return if (cachedPhotos.isNotEmpty()) cachedPhotos else null
     }
 
+    fun removePhotos(ids: Set<String>) {
+        if (ids.isEmpty()) return
+        cachedPhotos = cachedPhotos.filterNot { ids.contains(it.id) }
+    }
+
     fun clear() {
         cachedPhotos = emptyList()
     }

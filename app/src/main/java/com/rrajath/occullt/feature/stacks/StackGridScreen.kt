@@ -48,6 +48,7 @@ import com.rrajath.occullt.ui.component.DoneLabel
 import com.rrajath.occullt.ui.component.MarkDonePill
 import com.rrajath.occullt.ui.icon.CullIcons
 import com.rrajath.occullt.ui.theme.ThemeColors
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -58,6 +59,7 @@ fun StackGridScreen(
     stackIndex: Int,
     onNavigateBack: () -> Unit,
     onPhotoClick: (Int, String?) -> Unit,
+    reloadTrigger: StateFlow<Int>,
     settingsRepository: SettingsRepository,
     modifier: Modifier = Modifier,
 ) {
@@ -75,21 +77,28 @@ fun StackGridScreen(
     }
     val isDone = currentStackKey != null && doneKeys.contains(currentStackKey)
 
-    LaunchedEffect(stackIndex) {
-        val photos = PhotoStackCache.stacks[stackIndex]
-        if (photos != null) {
-            stackPhotos = photos
-            val dateFormat = SimpleDateFormat("MMM d, yyyy, h:mm a", Locale.US)
-            val timeFormat = SimpleDateFormat("h:mm a", Locale.US)
-            val startDate = Date(photos.first().dateModified)
-            val endDate = Date(photos.last().dateModified)
-            title = if (SimpleDateFormat("yyyyMMdd", Locale.US).format(startDate)
-                == SimpleDateFormat("yyyyMMdd", Locale.US).format(endDate)
-            ) {
-                "${dateFormat.format(startDate)} - ${timeFormat.format(endDate)}"
-            } else {
-                "${dateFormat.format(startDate)} - ${dateFormat.format(endDate)}"
-            }
+    // Deletions made in the viewer scrub PhotoStackCache directly; re-read it
+    // whenever the shared reload trigger fires so this screen doesn't keep
+    // showing photos that were just culled.
+    val reloadValue by reloadTrigger.collectAsState()
+
+    LaunchedEffect(stackIndex, reloadValue) {
+        val photos = PhotoStackCache.stacks[stackIndex] ?: return@LaunchedEffect
+        stackPhotos = photos
+        if (photos.isEmpty()) {
+            title = ""
+            return@LaunchedEffect
+        }
+        val dateFormat = SimpleDateFormat("MMM d, yyyy, h:mm a", Locale.US)
+        val timeFormat = SimpleDateFormat("h:mm a", Locale.US)
+        val startDate = Date(photos.first().dateModified)
+        val endDate = Date(photos.last().dateModified)
+        title = if (SimpleDateFormat("yyyyMMdd", Locale.US).format(startDate)
+            == SimpleDateFormat("yyyyMMdd", Locale.US).format(endDate)
+        ) {
+            "${dateFormat.format(startDate)} - ${timeFormat.format(endDate)}"
+        } else {
+            "${dateFormat.format(startDate)} - ${dateFormat.format(endDate)}"
         }
     }
 
