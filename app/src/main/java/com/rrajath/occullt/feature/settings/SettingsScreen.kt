@@ -55,6 +55,7 @@ import com.rrajath.occullt.ui.component.SourceMode
 import com.rrajath.occullt.ui.component.ToggleRow
 import com.rrajath.occullt.ui.icon.CullIcons
 import com.rrajath.occullt.ui.theme.CatppuccinAccents
+import com.rrajath.occullt.ui.theme.Danger
 import com.rrajath.occullt.ui.theme.ThemeColors
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
@@ -353,6 +354,15 @@ fun SettingsScreen(
                             },
                             placeholder = "https://immich.example.com"
                         )
+                        if (immichUrl.trim().startsWith("http://", ignoreCase = true)) {
+                            Text(
+                                text = "HTTP is blocked: it would send your API key unencrypted. Use an https:// URL.",
+                                style = androidx.compose.material3.MaterialTheme.typography.labelLarge.copy(
+                                    color = Danger,
+                                    fontSize = 12.sp
+                                )
+                            )
+                        }
                         SettingsInputRow(
                             label = "API Key",
                             value = immichApiKey,

@@ -1,4 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <network-security-config>
-    <base-config cleartextTrafficPermitted="true" />
+    <!-- Cleartext HTTP is blocked so the Immich x-api-key header can never be
+         sent unencrypted. Self-hosted servers must be reachable over HTTPS. -->
+    <base-config cleartextTrafficPermitted="false" />
 </network-security-config>
