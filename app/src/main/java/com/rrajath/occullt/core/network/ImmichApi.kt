@@ -6,10 +6,12 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.add
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.put
+import kotlinx.serialization.json.putJsonArray
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -254,8 +256,10 @@ class ImmichApi(
     ): Result<Unit> = withContext(Dispatchers.IO) {
         try {
             val url = "$baseUrl/api/assets"
-            val idsJson = assetIds.joinToString(",") { "\"$it\"" }
-            val body = """{"ids":[$idsJson],"force":$force}"""
+            val body = buildJsonObject {
+                putJsonArray("ids") { assetIds.forEach { add(it) } }
+                put("force", force)
+            }.toString()
 
             val request = Request.Builder()
                 .url(url)

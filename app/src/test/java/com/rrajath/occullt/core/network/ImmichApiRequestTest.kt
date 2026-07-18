@@ -75,4 +75,18 @@ class ImmichApiRequestTest {
         )
         assertEquals(false, body["force"]!!.jsonPrimitive.content.toBoolean())
     }
+
+    @Test
+    fun `deleteAssets escapes special characters in ids`() = runTest {
+        server.enqueue(MockResponse().setResponseCode(204))
+
+        // server-issued IDs are UUIDs in practice, but the body must stay valid
+        // JSON even for hostile input
+        val hostileId = """id"with\quotes"""
+        api.deleteAssets(listOf(hostileId), force = true)
+
+        val body = Json.parseToJsonElement(server.takeRequest().body.readUtf8()) as JsonObject
+        assertEquals(listOf(hostileId), body["ids"]!!.jsonArray.map { it.jsonPrimitive.content })
+        assertEquals(true, body["force"]!!.jsonPrimitive.content.toBoolean())
+    }
 }
