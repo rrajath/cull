@@ -12,10 +12,25 @@
 #   public *;
 #}
 
-# Uncomment this to preserve the line number information for
-# debugging stack traces.
-#-keepattributes SourceFile,LineNumberTable
+# Keep line numbers so Sentry stack traces stay readable in release builds.
+-keepattributes SourceFile,LineNumberTable
+-renamesourcefileattribute SourceFile
 
-# If you keep the line number information, uncomment this to
-# hide the original source file name.
-#-renamesourcefileattribute SourceFile
+# Strip debug/verbose/info logging from release builds so request details
+# (URLs, asset IDs) never reach logcat in production. Log.w/Log.e are kept.
+-assumenosideeffects class android.util.Log {
+    public static int v(...);
+    public static int d(...);
+    public static int i(...);
+}
+
+# kotlinx.serialization: keep generated serializers for @Serializable classes
+# (SettingsExport, type-safe navigation routes) that are looked up reflectively.
+-keepattributes *Annotation*, InnerClasses
+-keepclassmembers class com.rrajath.occullt.** {
+    *** Companion;
+}
+-keepclasseswithmembers class com.rrajath.occullt.** {
+    kotlinx.serialization.KSerializer serializer(...);
+}
+-keep,includedescriptorclasses class com.rrajath.occullt.**$$serializer { *; }
