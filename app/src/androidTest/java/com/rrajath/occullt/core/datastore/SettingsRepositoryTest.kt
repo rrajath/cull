@@ -224,4 +224,46 @@ class SettingsRepositoryTest {
         repo.setGroupingWindowMinutes(10)
         assertEquals(10, repo.groupingWindowMinutes.first())
     }
+
+    @Test
+    fun importSettingsSanitizesMaliciousValues() = runBlocking {
+        repo.importSettings(
+            SettingsExport(
+                sourceMode = "NotARealMode",
+                immichUrl = "https://immich.example.com",
+                longPressThresholdMs = -1,
+                dryRun = true,
+                mirrorDeletes = false,
+                darkTheme = true,
+                accentHue = 999,
+                groupingWindowMinutes = 0,
+            )
+        )
+
+        // the poisoned sourceMode must not crash subsequent reads
+        assertEquals(SourceMode.Hybrid, repo.sourceMode.first())
+        assertEquals(80, repo.longPressThreshold.first())
+        assertEquals(0, repo.accentHue.first())
+        assertEquals(1, repo.groupingWindowMinutes.first())
+        assertTrue(repo.dryRun.first())
+    }
+
+    @Test
+    fun importSettingsRoundTripsValidExport() = runBlocking {
+        repo.setSourceMode(SourceMode.Immich)
+        repo.setImmichUrl("https://immich.example.com")
+        repo.setLongPressThreshold(300)
+        repo.setAccentHue(4)
+        repo.setGroupingWindowMinutes(5)
+
+        val export = repo.exportSettings()
+        repo.setSourceMode(SourceMode.Local)
+        repo.importSettings(export)
+
+        assertEquals(SourceMode.Immich, repo.sourceMode.first())
+        assertEquals("https://immich.example.com", repo.immichUrl.first())
+        assertEquals(300, repo.longPressThreshold.first())
+        assertEquals(4, repo.accentHue.first())
+        assertEquals(5, repo.groupingWindowMinutes.first())
+    }
 }

@@ -39,7 +39,9 @@ class SettingsRepository(context: Context) {
 
     val sourceMode: Flow<SourceMode> = dataStore.data.map { prefs ->
         val mode = prefs[Keys.SOURCE_MODE] ?: SourceMode.Hybrid.name
-        SourceMode.valueOf(mode)
+        // Tolerate unexpected persisted values (e.g. from an old import) instead
+        // of crashing on every read via SourceMode.valueOf
+        SourceMode.entries.find { it.name == mode } ?: SourceMode.Hybrid
     }
 
     val libraryFolderUri: Flow<String?> = dataStore.data.map { prefs ->
@@ -213,7 +215,8 @@ class SettingsRepository(context: Context) {
         )
     }
 
-    suspend fun importSettings(export: SettingsExport) {
+    suspend fun importSettings(rawExport: SettingsExport) {
+        val export = rawExport.sanitized()
         dataStore.edit { prefs ->
             prefs[Keys.SOURCE_MODE] = export.sourceMode
             if (export.immichUrl != null) {
