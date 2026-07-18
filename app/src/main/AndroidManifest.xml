@@ -35,15 +35,18 @@
     <meta-data android:name="io.sentry.release" android:value="${sentryRelease}" />
     <!-- set up sentry session tracking -->
     <meta-data android:name="io.sentry.session-tracking.timeout-interval-millis" android:value="60000" />
-    <!-- enable automatic breadcrumbs for user interactions (clicks, swipes, scrolls) -->
-    <meta-data android:name="io.sentry.traces.user-interaction.enable" android:value="true" />
-    <!-- enable screenshot for crashes (could contain sensitive/PII data) -->
-    <meta-data android:name="io.sentry.attach-screenshot" android:value="true" />
-    <!-- enable view hierarchy for crashes -->
-    <meta-data android:name="io.sentry.attach-view-hierarchy" android:value="true" />
+    <!-- interaction breadcrumbs disabled: detailed usage tracking conflicts with
+         the app's self-hosted/privacy posture -->
+    <meta-data android:name="io.sentry.traces.user-interaction.enable" android:value="false" />
+    <!-- screenshots disabled: a crash screenshot in a photo-culling app is almost
+         certainly a personal photo — must never be uploaded to Sentry -->
+    <meta-data android:name="io.sentry.attach-screenshot" android:value="false" />
+    <!-- view hierarchy disabled: can embed on-screen content/PII -->
+    <meta-data android:name="io.sentry.attach-view-hierarchy" android:value="false" />
 
-    <!-- enable the performance API by setting a sample-rate, adjust in production env -->
-    <meta-data android:name="io.sentry.traces.sample-rate" android:value="1.0" />
+    <!-- low sample rate: enough signal for performance regressions without
+         recording every session -->
+    <meta-data android:name="io.sentry.traces.sample-rate" android:value="0.1" />
 </application>
 
 </manifest>
