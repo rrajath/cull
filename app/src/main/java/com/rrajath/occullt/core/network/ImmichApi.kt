@@ -10,6 +10,7 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.put
+import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody
@@ -282,7 +283,13 @@ class ImmichApi(
 
     suspend fun checkAssetExists(fileName: String, dateModifiedMs: Long): Result<Boolean> = withContext(Dispatchers.IO) {
         try {
-            val url = "$baseUrl/api/search/metadata?originalFileName=$fileName&type=IMAGE&size=1"
+            // HttpUrl.Builder percent-encodes the filename, which may contain
+            // characters like &, #, +, ? that would otherwise corrupt the query
+            val url = "$baseUrl/api/search/metadata".toHttpUrl().newBuilder()
+                .addQueryParameter("originalFileName", fileName)
+                .addQueryParameter("type", "IMAGE")
+                .addQueryParameter("size", "1")
+                .build()
 
             val request = Request.Builder()
                 .url(url)
