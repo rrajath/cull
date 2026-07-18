@@ -73,7 +73,10 @@ class LibraryViewModel(
 
     private fun obtainRepo(sourceMode: SourceMode, immichUrl: String?, immichApiKey: String?): UnifiedPhotoRepository {
         val immichEnabled = sourceMode != SourceMode.Local && !immichUrl.isNullOrBlank() && !immichApiKey.isNullOrBlank()
-        OcculltApplication.setImmichApiKey(if (immichEnabled) immichApiKey else null)
+        OcculltApplication.setImmichCredentials(
+            if (immichEnabled) immichApiKey else null,
+            if (immichEnabled) immichUrl else null,
+        )
 
         val key = if (immichEnabled) "$immichUrl|$immichApiKey" else "local"
         cachedRepo?.let { repo ->

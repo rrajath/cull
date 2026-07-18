@@ -27,7 +27,7 @@ fun defaultWizardPhotoLoader(
     val immichApiKey = settingsRepository.immichApiKey.first()
 
     val immichRepo = if (sourceMode != SourceMode.Local && !immichUrl.isNullOrBlank() && !immichApiKey.isNullOrBlank()) {
-        OcculltApplication.setImmichApiKey(immichApiKey)
+        OcculltApplication.setImmichCredentials(immichApiKey, immichUrl)
         val mappingDb = ImmichAssetMappingDb.getInstance(context)
         ImmichRepository(ImmichApi(immichUrl, immichApiKey), mappingDb)
     } else {

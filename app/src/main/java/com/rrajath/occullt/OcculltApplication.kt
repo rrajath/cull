@@ -6,6 +6,7 @@ import coil3.SingletonImageLoader
 import coil3.disk.DiskCache
 import coil3.memory.MemoryCache
 import coil3.network.okhttp.OkHttpNetworkFetcherFactory
+import com.rrajath.occullt.core.network.ImmichKeyGate
 import okhttp3.Interceptor
 import okhttp3.OkHttpClient
 import okio.Path.Companion.toOkioPath
@@ -21,8 +22,12 @@ class OcculltApplication : Application() {
         var immichApiKey: String? = null
             private set
 
-        fun setImmichApiKey(key: String?) {
+        var immichBaseUrl: String? = null
+            private set
+
+        fun setImmichCredentials(key: String?, baseUrl: String?) {
             immichApiKey = key
+            immichBaseUrl = baseUrl
         }
     }
 
@@ -33,8 +38,7 @@ class OcculltApplication : Application() {
         val okHttpClient = OkHttpClient.Builder()
             .addInterceptor(Interceptor { chain ->
                 val request = chain.request()
-                val url = request.url.toString()
-                val newRequest = if (url.contains("/api/assets/") && !immichApiKey.isNullOrBlank()) {
+                val newRequest = if (ImmichKeyGate.shouldAttachKey(request.url, immichBaseUrl, immichApiKey)) {
                     request.newBuilder()
                         .addHeader("x-api-key", immichApiKey!!)
                         .build()

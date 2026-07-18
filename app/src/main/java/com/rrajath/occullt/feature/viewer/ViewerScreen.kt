@@ -135,9 +135,9 @@ fun ViewerScreen(
             val key = settingsRepository.immichApiKey.first()
 
             if (sourceMode != SourceMode.Local && !immichUrl.isNullOrBlank() && !key.isNullOrBlank()) {
-                OcculltApplication.setImmichApiKey(key)
+                OcculltApplication.setImmichCredentials(key, immichUrl)
             } else {
-                OcculltApplication.setImmichApiKey(null)
+                OcculltApplication.setImmichCredentials(null, null)
             }
 
             val cached = PhotoCache.getPhotos()
