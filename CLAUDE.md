@@ -120,14 +120,15 @@ All exposed as `Flow<T>`.
 - Zoom/pan of current photo mirrors to pinned photo
 
 ### Immich API (`ImmichApi.kt`)
-- Auth: `x-api-key` header injected by OkHttp interceptor in `OcculltApplication` for `/api/assets/` paths
+- Auth: `x-api-key` header injected by OkHttp interceptor in `OcculltApplication`; `ImmichKeyGate` only allows it when the request's scheme/host/port match the configured Immich URL and the path is an `/api/assets/` endpoint
+- Cleartext HTTP is blocked app-wide (`network_security_config.xml`) — server URLs must be `https://`
 - Pagination: offset-based (`page` + `size`), no cursor
 - Search: `POST /api/search/metadata` → results at `assets.items` (nested)
 - JSON parsed manually via `JsonElement`/`JsonObject` (no Moshi/Gson)
 
 ### Application Setup (`OcculltApplication`)
 - Initializes Coil 3 singleton with OkHttp fetcher (memory cache 25%, disk 2%)
-- Stores Immich API key globally (companion object); updated when settings change
+- Stores Immich credentials (API key + base URL) globally (companion object); updated when settings change
 
 ## Testing
 
@@ -135,6 +136,9 @@ All exposed as `Flow<T>`.
 Uses `mockk` + `kotlinx.coroutines.test`. Key test files:
 - `ImmichApiTest` — API response parsing
 - `ImmichRepositoryTest` — photo fetching, URL gen, deletion
+- `ImmichApiRequestTest` — MockWebServer-backed request tests (URL encoding, auth header, delete body)
+- `ImmichKeyGateTest` — API-key host-scoping rules
+- `SettingsExportTest` — settings-import sanitization
 - `StacksViewModelTest` — grouping algorithm
 - `ViewerViewModelTest` — state transitions
 
@@ -155,5 +159,6 @@ Uses `MockWebServer` for HTTP, real DataStore/SQLite:
 | `core/network/ImmichApi.kt` | Immich HTTP client |
 | `core/database/ImmichAssetMappingDb.kt` | Local↔Immich filename mapping (singleton, double-checked locking) |
 | `ui/theme/Color.kt` | Catppuccin-based palette + `ExtendedColorScheme` |
+| `core/network/ImmichKeyGate.kt` | Host-scoping gate for API-key injection |
 | `gradle/libs.versions.toml` | All dependency versions |
-| `IMPLEMENTATION_PLAN.md` | Feature design specs and decisions |
+| `docs/SECURITY_AUDIT.md` | Security audit findings and remediation status |

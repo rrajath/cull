@@ -101,7 +101,7 @@ Wizard segment state and the local↔Immich asset mapping live in SQLite (`core/
 
 ### Immich integration
 
-- Auth: an OkHttp interceptor registered in `OcculltApplication` injects the `x-api-key` header for all `/api/assets/` requests, using an API key held in a companion object and updated whenever Settings changes it.
+- Auth: an OkHttp interceptor registered in `OcculltApplication` injects the `x-api-key` header for image requests. `ImmichKeyGate` gates the injection — the request's scheme, host, and port must match the configured Immich base URL and the path must be an `/api/assets/` endpoint, so the key can never be sent to a foreign host. Credentials (key + base URL) are held in a companion object and updated whenever Settings changes them.
 - Pagination is offset-based (`page` + `size`); there is no cursor API.
 - Search uses `POST /api/search/metadata`, whose results are nested at `assets.items`.
 
@@ -119,7 +119,7 @@ Wizard segment state and the local↔Immich asset mapping live in SQLite (`core/
 | `kotlinx.serialization` (`JsonElement`) | Immich response parsing | Small, irregular API surface — avoids maintaining a full DTO layer for a handful of endpoints. |
 | Jetpack DataStore | Scalar settings | Modern replacement for `SharedPreferences`; async, `Flow`-based, matches the reactive Settings screen. |
 | Raw SQLite (`SQLiteOpenHelper`) | Asset-ID mapping, Wizard segment state | Two small, stable, query-simple schemas; avoids Room's codegen/entity overhead for this scale. |
-| Sentry | Crash reporting | Wired via `io.sentry.android.gradle`; releases tagged with the git-commit-count version so crashes map back to a specific build. |
+| Sentry | Crash reporting | Wired via `io.sentry.android.gradle`; releases tagged with the git-commit-count version so crashes map back to a specific build. Privacy-constrained: screenshots, view-hierarchy attachment, and interaction breadcrumbs are disabled (a crash screenshot in a photo app is almost certainly a personal photo); traces sampled at 10%. |
 | No DI framework | Object construction | Single-module app; manual `ViewModelFactory` per feature keeps wiring explicit without Hilt/Koin codegen overhead. |
 
 Key versions (see `gradle/libs.versions.toml` for the full list): AGP 9.0.1, Kotlin 2.0.21, compileSdk/targetSdk 36, minSdk 34, Java 11 toolchain.
@@ -128,8 +128,19 @@ Key versions (see `gradle/libs.versions.toml` for the full list): AGP 9.0.1, Kot
 
 - Single Gradle module (`:app`); root `build.gradle.kts` only declares plugin versions (`apply false`).
 - `versionName`/`versionCode` are **not** hand-maintained — both are derived at build time from `git rev-list --count HEAD` (a `gitCommitCount()` function in `app/build.gradle.kts`), so every commit produces a unique, monotonically increasing version. The same value is used as the Sentry release identifier and the CI release tag.
-- `.github/workflows/build.yaml` runs on every push to `master`: full-history checkout (needed for the commit-count version), JDK 17 setup, `./gradlew assembleDebug assembleRelease` (release signed from a base64-encoded keystore secret, cleaned up unconditionally afterward), then a GitHub Release tagged `v<version>` with both APKs and auto-generated notes.
+- `.github/workflows/build.yaml` runs on every push to `master`: full-history checkout (needed for the commit-count version), JDK 17 setup, `./gradlew assembleRelease` (R8-minified, signed from a base64-encoded keystore secret, cleaned up unconditionally afterward), then a GitHub Release tagged `v<version>` with the release APK and auto-generated notes. Actions are pinned to full commit SHAs, not mutable tags.
 - **Known gap**: CI does not currently run `./gradlew test` or `./gradlew lint` as a separate job — only `assembleDebug`/`assembleRelease`. Tests exist (`app/src/test`, `app/src/androidTest`) but must be run locally or added to CI explicitly.
+
+## Security Posture
+
+Hardening applied after the 2026-07 audit (see [`SECURITY_AUDIT.md`](SECURITY_AUDIT.md)):
+
+- **Transport**: cleartext HTTP is blocked app-wide (`network_security_config.xml`); the settings screen warns when an `http://` Immich URL is entered. The API key is only ever sent over TLS.
+- **Key scoping**: `ImmichKeyGate` restricts `x-api-key` injection to asset requests whose scheme/host/port match the configured server.
+- **Backups**: `files/datastore/` (which holds the API key in the Preferences DataStore) is excluded from cloud backup and device-to-device transfer in both `backup_rules.xml` and `data_extraction_rules.xml`.
+- **Crash reporting**: Sentry ships no screenshots, view hierarchies, or interaction breadcrumbs; traces sampled at 10%.
+- **Release builds**: R8-minified with `Log.v/d/i` stripped; only the release APK is published.
+- **Input handling**: settings imports are sanitized (`SettingsExport.sanitized()`); Immich request URLs/bodies are built with `HttpUrl.Builder` and `kotlinx.serialization` rather than string concatenation.
 
 ## Testing Strategy
 

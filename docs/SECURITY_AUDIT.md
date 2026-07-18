@@ -3,6 +3,25 @@
 **Date:** 2026-07-10
 **Scope:** Full repository — Android manifest, network security config, backup rules, Immich API client, secret storage and handling, settings export/import, SQLite layer, logging, CI/release pipeline, and full VCS history scan for committed secrets.
 
+## Remediation Status (2026-07-18)
+
+All 10 findings were addressed, one commit per finding:
+
+| # | Finding | Resolution |
+|---|---|---|
+| 1 | Cleartext HTTP | Blocked app-wide; settings screen warns on `http://` URLs |
+| 2 | API key in backups | `files/datastore/` excluded from cloud backup and device transfer |
+| 3 | Key attached by URL substring | `ImmichKeyGate` matches scheme/host/port against the configured server |
+| 4 | Sentry data collection | Screenshots, view hierarchy, and interaction breadcrumbs off; traces at 0.1 |
+| 5 | Deletion logging | `Log.d` statements removed; release builds also strip `Log.v/d/i` via R8 |
+| 6 | Unencoded filename in URL | Built with `HttpUrl.Builder.addQueryParameter` |
+| 7 | Unvalidated settings import | `SettingsExport.sanitized()` + tolerant `sourceMode` read |
+| 8 | Hand-rolled delete JSON | Built with `buildJsonObject` |
+| 9 | Release hardening | R8 enabled with log stripping; debug APK no longer published |
+| 10 | CI supply chain | Actions pinned to commit SHAs; Sentry inbound filters remain a project-side setting |
+
+Deliberate accepts: `includeSourceContext` stays enabled (source exposure to Sentry accepted); the DSN stays client-embedded (by design).
+
 ---
 
 ## High Severity
