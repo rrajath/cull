@@ -163,3 +163,28 @@ Uses `MockWebServer` for HTTP, real DataStore/SQLite:
 | `core/network/ImmichKeyGate.kt` | Host-scoping gate for API-key injection |
 | `gradle/libs.versions.toml` | All dependency versions |
 | `docs/SECURITY_AUDIT.md` | Security audit findings and remediation status |
+
+## Standing engineering rules (always active)
+
+Added by the android-dev-workflow skill (`init`), adapted to this repo's conventions.
+
+### Version control hygiene
+- Fetch from the remote (`jj git fetch`) and rebase local changes onto it before making any code change. This repo uses jj; fall back to git only if a jj command fails.
+- When a request implies multiple distinct changes, commit each one separately so history stays atomic and revertable. Never bundle unrelated changes into a single commit.
+
+### Changelog discipline
+- Every code change (feature, fix, refactor, dependency bump) gets an entry in `CHANGELOG.md` under `## [Unreleased]`, in the same commit as the change itself, not batched at the end of a session.
+- Use Keep a Changelog sub-groups under Unreleased: `### Added`, `### Changed`, `### Fixed`, `### Removed`. Create a sub-heading if it doesn't exist yet; omit empty ones.
+- Never manually move entries from `Unreleased` into a versioned section. The release workflow (`.github/workflows/release.yml`) does that on tag push; editing that boundary by hand will conflict with CI.
+
+### Versioning
+- `versionName` in `app/build.gradle.kts` is hand-maintained semver (`MAJOR.MINOR.PATCH`). `versionCode` is derived from it as `MAJOR * 10000 + MINOR * 100 + PATCH` (1.2.3 -> 10203); never set it by hand. MINOR and PATCH must stay at or below 99.
+
+### Documentation currency
+- Any code change (feature, bug fix, refactor, dependency change, structural change) should be reflected in `README.md`, `docs/ARCHITECTURE.md`, and the relevant file(s) under `docs/` in the same commit. When unsure whether a change is material enough, update rather than skip.
+- Any change that touches UI (a Composable, a layout XML, a theme/style resource, a color or typography token) must follow and update the design system doc in the same commit. The existing doc is `docs/DESIGN_SYSTEM.md`; don't invent colors, spacing, or components it doesn't cover, ask instead.
+- These are incremental keep-alive edits, not full regenerations. Run the `create-documentation` command periodically for a full pass that catches drift.
+
+### Progress tracking
+- Whenever a task is assigned (feature, bug fix, refactor), log it in `PROGRESS.md` at the repo root with a status (`Not started` / `In progress` / `Blocked` / `Done`) and keep the status current as work moves along.
+- `PROGRESS.md` is gitignored and never committed; it is scratch space, not a deliverable.
