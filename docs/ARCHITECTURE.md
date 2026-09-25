@@ -140,7 +140,7 @@ Hardening applied after the 2026-07 audit (see [`SECURITY_AUDIT.md`](SECURITY_AU
 - **Key scoping**: `ImmichKeyGate` restricts `x-api-key` injection to asset requests whose scheme/host/port match the configured server.
 - **Backups**: `files/datastore/` (which holds the API key in the Preferences DataStore) is excluded from cloud backup and device-to-device transfer in both `backup_rules.xml` and `data_extraction_rules.xml`.
 - **Crash reporting**: Sentry ships no screenshots, view hierarchies, or interaction breadcrumbs; traces sampled at 10%.
-- **Release builds**: R8-minified with `Log.v/d/i` stripped; only the release APK is published.
+- **Release builds**: R8-minified with `Log.v/d/i` stripped, plus resource shrinking (`isShrinkResources = true`) to drop unused resources. CI publishes both the release and the debug APK (see finding 9 in SECURITY_AUDIT.md).
 - **Input handling**: settings imports are sanitized (`SettingsExport.sanitized()`); Immich request URLs/bodies are built with `HttpUrl.Builder` and `kotlinx.serialization` rather than string concatenation.
 
 ## Testing Strategy
