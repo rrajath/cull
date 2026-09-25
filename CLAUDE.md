@@ -8,6 +8,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 - **Min SDK:** Android 14 (API 34), **Target SDK:** Android 15 (API 36)
 - **Build system:** Gradle with Kotlin DSL; single `:app` module
+- **Build variants:** `debug` uses applicationId `com.rrajath.cull.debug`, app name "Cull Debug" (via `resValue`, so read the name from `R.string.app_name`, never hardcode it), and versionName `<version> (debug)`; it installs alongside `release`
 - **No DI framework** — manual `ViewModelFactory` pattern throughout
 
 ## Commands

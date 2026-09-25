@@ -89,6 +89,8 @@ On first launch, choose **Library** and pick a folder via the system folder pick
 
 Release builds are signed and Sentry-enabled; see [Versioning & Releases](#versioning--releases) below for how CI produces official builds.
 
+Debug builds install as a separate app (`com.rrajath.cull.debug`, shown as "Cull Debug", version `<version> (debug)`), so you can keep a debug build and the release build on the same device. They do not share settings or data.
+
 ## Versioning & Releases
 
 Cull doesn't use a hand-maintained version number. `versionName` and `versionCode` are both derived at build time from the total commit count on the branch (`git rev-list --count HEAD`), so every commit to `master` gets a unique, monotonically increasing version automatically.
