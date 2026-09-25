@@ -17,7 +17,7 @@ All 10 findings were addressed, one commit per finding:
 | 6 | Unencoded filename in URL | Built with `HttpUrl.Builder.addQueryParameter` |
 | 7 | Unvalidated settings import | `SettingsExport.sanitized()` + tolerant `sourceMode` read |
 | 8 | Hand-rolled delete JSON | Built with `buildJsonObject` |
-| 9 | Release hardening | R8 enabled with log stripping; debug APK no longer published |
+| 9 | Release hardening | R8 enabled with log stripping. **Debug APK re-published 2026-09-24 (owner decision)** as `cull-v<version>-debug.apk` on GitHub Releases; debuggable, debug-signed build is public again. Open risk. |
 | 10 | CI supply chain | Actions pinned to commit SHAs; Sentry inbound filters remain a project-side setting |
 
 Deliberate accepts: `includeSourceContext` stays enabled (source exposure to Sentry accepted); the DSN stays client-embedded (by design).

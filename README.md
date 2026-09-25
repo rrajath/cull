@@ -96,9 +96,9 @@ Cull doesn't use a hand-maintained version number. `versionName` and `versionCod
 On every push to `master`, [`.github/workflows/build.yaml`](.github/workflows/build.yaml):
 
 1. Computes the version from commit count.
-2. Builds `assembleRelease` (R8-minified, signed using a keystore secret).
+2. Builds `assembleRelease` (R8-minified, signed using a keystore secret) and `assembleDebug`.
 3. Uploads build/release info to [Sentry](https://sentry.io) for crash reporting, tagged with the computed version.
-4. Publishes a GitHub Release tagged `v<version>` with the release APK attached and auto-generated release notes.
+4. Renames the APKs to `cull-v<version>-<variant>.apk` (e.g. `cull-v1.2.3-release.apk`) and publishes a GitHub Release tagged `v<version>` with both the release and debug APKs attached and auto-generated release notes. Local builds keep Gradle's default `app-<variant>.apk` names.
 
 There is no separate CI job for tests/lint today — see [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for details and known gaps.
 

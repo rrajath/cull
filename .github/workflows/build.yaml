@@ -11,6 +11,10 @@ concurrency:
   group: build-${{ github.ref }}
   cancel-in-progress: false
 
+env:
+  # Lowercase app name used in CI artifact names: {APP_NAME}-v{version}-{variant}.apk
+  APP_NAME: cull
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -42,7 +46,7 @@ jobs:
       - name: Decode signing keystore
         run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > "$RUNNER_TEMP/release.keystore"
 
-      - name: Build release APK
+      - name: Build release and debug APKs
         env:
           KEYSTORE_PATH: ${{ runner.temp }}/release.keystore
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
@@ -50,11 +54,25 @@ jobs:
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
           SENTRY_RELEASE: ${{ steps.version.outputs.version }}
-        run: ./gradlew assembleRelease
+        run: ./gradlew assembleRelease assembleDebug
 
       - name: Remove decoded keystore
         if: always()
         run: rm -f "$RUNNER_TEMP/release.keystore"
+
+      # CI-only artifact naming: {APP_NAME}-v{version}-{variant}.apk (e.g. cull-v1.0.60-release.apk).
+      # Local builds keep Gradle's default app-{variant}.apk names.
+      - name: Rename APKs
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          mkdir -p dist
+          for VARIANT in release debug; do
+            SRC="app/build/outputs/apk/$VARIANT/app-$VARIANT.apk"
+            DEST="dist/${APP_NAME}-v${VERSION}-${VARIANT}.apk"
+            test -f "$SRC" || { echo "Missing $SRC"; exit 1; }
+            mv "$SRC" "$DEST"
+            echo "Built $DEST"
+          done
 
       - name: Publish GitHub Release
         env:
@@ -62,6 +80,7 @@ jobs:
         run: |
           VERSION="${{ steps.version.outputs.version }}"
           gh release create "v$VERSION" \
-            app/build/outputs/apk/release/app-release.apk \
+            "dist/${APP_NAME}-v${VERSION}-release.apk" \
+            "dist/${APP_NAME}-v${VERSION}-debug.apk" \
             --title "v$VERSION" \
             --generate-notes
