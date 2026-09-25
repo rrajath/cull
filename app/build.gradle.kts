@@ -51,6 +51,12 @@ android {
     }
 
     buildTypes {
+        // Debug installs alongside release: distinct package, launcher name, and version label
+        debug {
+            applicationIdSuffix = ".debug"
+            resValue("string", "app_name", "Cull Debug")
+            versionNameSuffix = " (debug)"
+        }
         release {
             isMinifyEnabled = true
             proguardFiles(
@@ -72,6 +78,8 @@ android {
     }
     buildFeatures {
         compose = true
+        // AGP 9 disables resValue by default; needed for the debug app_name override
+        resValues = true
     }
 
     testOptions {
