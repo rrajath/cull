@@ -5,6 +5,8 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-09-25
+
 ### Added
 
 - Debug build variant that installs alongside release: package `com.rrajath.cull.debug`, shown as "Cull Debug", version suffixed with " (debug)".
@@ -32,3 +34,4 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Removed
 
 - Verbose deletion logging from the Immich client.
+
