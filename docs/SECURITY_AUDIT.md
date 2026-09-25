@@ -9,7 +9,7 @@ All 10 findings were addressed, one commit per finding:
 
 | # | Finding | Resolution |
 |---|---|---|
-| 1 | Cleartext HTTP | Blocked app-wide; settings screen warns on `http://` URLs |
+| 1 | Cleartext HTTP | **Reverted 2026-09-24 (owner decision):** cleartext allowed app-wide again so plain-HTTP Immich servers work; settings screen warns on `http://` URLs. Open risk. |
 | 2 | API key in backups | `files/datastore/` excluded from cloud backup and device transfer |
 | 3 | Key attached by URL substring | `ImmichKeyGate` matches scheme/host/port against the configured server |
 | 4 | Sentry data collection | Screenshots, view hierarchy, and interaction breadcrumbs off; traces at 0.1 |

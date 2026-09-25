@@ -121,7 +121,7 @@ All exposed as `Flow<T>`.
 
 ### Immich API (`ImmichApi.kt`)
 - Auth: `x-api-key` header injected by OkHttp interceptor in `CullApplication`; `ImmichKeyGate` only allows it when the request's scheme/host/port match the configured Immich URL and the path is an `/api/assets/` endpoint
-- Cleartext HTTP is blocked app-wide (`network_security_config.xml`) — server URLs must be `https://`
+- Cleartext HTTP is currently allowed app-wide (`network_security_config.xml`, `cleartextTrafficPermitted="true"`); Settings warns that `http://` URLs send the API key unencrypted
 - Pagination: offset-based (`page` + `size`), no cursor
 - Search: `POST /api/search/metadata` → results at `assets.items` (nested)
 - JSON parsed manually via `JsonElement`/`JsonObject` (no Moshi/Gson)

@@ -356,7 +356,7 @@ fun SettingsScreen(
                         )
                         if (immichUrl.trim().startsWith("http://", ignoreCase = true)) {
                             Text(
-                                text = "HTTP is blocked: it would send your API key unencrypted. Use an https:// URL.",
+                                text = "Unencrypted: your API key is sent in plain text over HTTP.",
                                 style = androidx.compose.material3.MaterialTheme.typography.labelLarge.copy(
                                     color = Danger,
                                     fontSize = 12.sp

@@ -135,7 +135,7 @@ Key versions (see `gradle/libs.versions.toml` for the full list): AGP 9.0.1, Kot
 
 Hardening applied after the 2026-07 audit (see [`SECURITY_AUDIT.md`](SECURITY_AUDIT.md)):
 
-- **Transport**: cleartext HTTP is blocked app-wide (`network_security_config.xml`); the settings screen warns when an `http://` Immich URL is entered. The API key is only ever sent over TLS.
+- **Transport**: cleartext HTTP is currently allowed app-wide (`network_security_config.xml`) so self-hosted Immich servers on plain `http://` work. The settings screen warns when an `http://` URL is entered, since the API key is then sent unencrypted. `ImmichKeyGate` still limits the key to the configured host. Set `cleartextTrafficPermitted` back to `false` to require TLS.
 - **Key scoping**: `ImmichKeyGate` restricts `x-api-key` injection to asset requests whose scheme/host/port match the configured server.
 - **Backups**: `files/datastore/` (which holds the API key in the Preferences DataStore) is excluded from cloud backup and device-to-device transfer in both `backup_rules.xml` and `data_extraction_rules.xml`.
 - **Crash reporting**: Sentry ships no screenshots, view hierarchies, or interaction breadcrumbs; traces sampled at 10%.

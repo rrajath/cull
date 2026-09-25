@@ -60,7 +60,7 @@ Open the project in Android Studio and run the `app` configuration on a device/e
 ./gradlew installDebug
 ```
 
-On first launch, choose **Library** and pick a folder via the system folder picker (local mode), or configure an Immich server URL and API key in **Settings** (Immich/Hybrid mode). The server URL must use `https://` — cleartext HTTP is blocked app-wide so the API key is never sent unencrypted.
+On first launch, choose **Library** and pick a folder via the system folder picker (local mode), or configure an Immich server URL and API key in **Settings** (Immich/Hybrid mode). Prefer an `https://` server URL. Cleartext `http://` is currently allowed, but the API key is then sent unencrypted and Settings shows a warning.
 
 ### Test
 
