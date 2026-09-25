@@ -1,0 +1,120 @@
+name: Release
+
+# Cut a release by bumping versionName in app/build.gradle.kts on master, then pushing
+# a matching tag (vX.Y.Z). This builds both APKs, publishes a GitHub Release with the
+# CHANGELOG's Unreleased entries as notes, then moves those entries into a versioned
+# section on master.
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+env:
+  # Lowercase app name used in CI artifact names: {APP_NAME}-v{version}-{variant}.apk
+  APP_NAME: cull
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          # Full history so the tagged commit can be checked against master.
+          fetch-depth: 0
+
+      - name: Set up JDK
+        uses: actions/setup-java@c1e323688fd81a25caa38c78aa6df2d33d3e20d9 # v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@0b6dd653ba04f4f93bf581ec31e66cbd7dcb644d # v4
+
+      # The tag must match versionName and point at a commit that is on master.
+      - name: Verify tag
+        id: version
+        run: |
+          VERSION="$(./gradlew -q printVersionName | tail -n1)"
+          if [ "$GITHUB_REF_NAME" != "v$VERSION" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match versionName $VERSION in app/build.gradle.kts"
+            exit 1
+          fi
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/master; then
+            echo "::error::Tag $GITHUB_REF_NAME points at a commit that is not on master"
+            exit 1
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Decode signing keystore
+        run: |
+          if [ -z "${{ secrets.KEYSTORE_BASE64 }}" ]; then
+            echo "::error::KEYSTORE_BASE64 secret is not set; refusing to publish a debug-signed release APK"
+            exit 1
+          fi
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > "$RUNNER_TEMP/release.keystore"
+
+      - name: Build release and debug APKs
+        env:
+          KEYSTORE_PATH: ${{ runner.temp }}/release.keystore
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_RELEASE: ${{ steps.version.outputs.version }}
+        run: ./gradlew assembleRelease assembleDebug
+
+      - name: Remove decoded keystore
+        if: always()
+        run: rm -f "$RUNNER_TEMP/release.keystore"
+
+      - name: Rename APKs
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          mkdir -p dist
+          for VARIANT in release debug; do
+            SRC="app/build/outputs/apk/$VARIANT/app-$VARIANT.apk"
+            DEST="dist/${APP_NAME}-v${VERSION}-${VARIANT}.apk"
+            test -f "$SRC" || { echo "Missing $SRC"; exit 1; }
+            mv "$SRC" "$DEST"
+            echo "Built $DEST"
+          done
+
+      # Notes come from the CHANGELOG as of the tagged commit.
+      - name: Publish GitHub Release
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          python3 .github/scripts/changelog.py notes CHANGELOG.md > "$RUNNER_TEMP/notes.md"
+          gh release create "$GITHUB_REF_NAME" \
+            "dist/${APP_NAME}-v${VERSION}-release.apk" \
+            "dist/${APP_NAME}-v${VERSION}-debug.apk" \
+            --title "$GITHUB_REF_NAME" \
+            --notes-file "$RUNNER_TEMP/notes.md"
+
+      # Only moves entries when master still points at the tagged commit; otherwise newer
+      # Unreleased entries on master would be swept into this version by mistake.
+      - name: Move Unreleased changelog entries into this version
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          git fetch origin master
+          if [ "$(git rev-parse origin/master)" != "$GITHUB_SHA" ]; then
+            echo "::warning::master has moved past $GITHUB_REF_NAME; CHANGELOG not updated. Move the $VERSION entries under a '## [$VERSION]' heading by hand."
+            exit 0
+          fi
+          git checkout -B master origin/master
+          python3 .github/scripts/changelog.py release CHANGELOG.md "$VERSION" "$(date -u +%Y-%m-%d)"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add CHANGELOG.md
+          git commit -m "Move Unreleased changelog entries into $GITHUB_REF_NAME"
+          git push origin master

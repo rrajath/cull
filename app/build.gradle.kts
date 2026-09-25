@@ -6,21 +6,23 @@ plugins {
     id("io.sentry.android.gradle") version "6.14.0"
 }
 
-// Single source of truth for the app version. Computed once here and reused for
-// versionName, the Sentry release manifest placeholder, and (via `printVersionName`)
-// the CI workflow that also tags the GitHub Release and sets SENTRY_RELEASE.
-fun gitCommitCount(): Int {
-    val process = ProcessBuilder("git", "rev-list", "--count", "HEAD")
-        .directory(rootDir)
-        .redirectErrorStream(true)
-        .start()
-    val out = process.inputStream.bufferedReader().readText().trim()
-    process.waitFor()
-    return out.toIntOrNull() ?: 1
-}
+// Single source of truth for the app version, bumped by hand on release (semver).
+// Reused for versionName, the Sentry release manifest placeholder, and (via
+// `printVersionName`) the release workflow, which checks the pushed tag matches it.
+val appVersionName = "1.0.58"
 
-val appVersionName = "1.0.${gitCommitCount()}"
-val appVersionCode = gitCommitCount()
+// versionCode = MAJOR * 10000 + MINOR * 100 + PATCH (1.2.3 -> 10203)
+val appVersionCode = run {
+    val parts = appVersionName.split(".").map { it.toIntOrNull() }
+    require(parts.size == 3 && parts.all { it != null && it >= 0 }) {
+        "versionName must be MAJOR.MINOR.PATCH, got \"$appVersionName\""
+    }
+    val (major, minor, patch) = parts.map { it!! }
+    require(minor <= 99 && patch <= 99) {
+        "MINOR and PATCH must be <= 99 for the versionCode scheme, got \"$appVersionName\""
+    }
+    major * 10000 + minor * 100 + patch
+}
 
 android {
     namespace = "com.rrajath.cull"

@@ -93,16 +93,25 @@ Debug builds install as a separate app (`com.rrajath.cull.debug`, shown as "Cull
 
 ## Versioning & Releases
 
-Cull doesn't use a hand-maintained version number. `versionName` and `versionCode` are both derived at build time from the total commit count on the branch (`git rev-list --count HEAD`), so every commit to `master` gets a unique, monotonically increasing version automatically.
+`versionName` in `app/build.gradle.kts` is hand-maintained semver (`MAJOR.MINOR.PATCH`). `versionCode` is derived from it as `MAJOR * 10000 + MINOR * 100 + PATCH` (so `1.2.3` is `10203`), and the build fails if MINOR or PATCH goes above 99. Changes are recorded in [`CHANGELOG.md`](CHANGELOG.md) under `## [Unreleased]` as they land.
 
-On every push to `master`, [`.github/workflows/build.yaml`](.github/workflows/build.yaml):
+**Every push to `master`** runs [`.github/workflows/build.yaml`](.github/workflows/build.yaml), which only builds `assembleRelease` (R8-minified with resource shrinking) and `assembleDebug` to validate them. Nothing is published.
 
-1. Computes the version from commit count.
-2. Builds `assembleRelease` (R8-minified with resource shrinking, signed using a keystore secret) and `assembleDebug`.
-3. Uploads build/release info to [Sentry](https://sentry.io) for crash reporting, tagged with the computed version.
-4. Renames the APKs to `cull-v<version>-<variant>.apk` (e.g. `cull-v1.2.3-release.apk`) and publishes a GitHub Release tagged `v<version>` with both the release and debug APKs attached and auto-generated release notes. Local builds keep Gradle's default `app-<variant>.apk` names.
+**To cut a release:**
 
-There is no separate CI job for tests/lint today — see [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for details and known gaps.
+1. Bump `appVersionName` in `app/build.gradle.kts` and commit (`Bump version to vX.Y.Z`) on `master`.
+2. Push `master`, then push a matching tag `vX.Y.Z`.
+
+The tag triggers [`.github/workflows/release.yml`](.github/workflows/release.yml), which:
+
+1. Fails unless the tag matches `versionName` and points at a commit on `master`.
+2. Builds the signed release APK (keystore from repo secrets; the run fails if `KEYSTORE_BASE64` is missing) and the debug APK, uploading build info to [Sentry](https://sentry.io) tagged with the version.
+3. Renames them to `cull-vX.Y.Z-release.apk` and `cull-vX.Y.Z-debug.apk` and publishes a GitHub Release with both attached, using the `Unreleased` changelog entries as release notes.
+4. Moves those entries into a `## [X.Y.Z] - YYYY-MM-DD` section and pushes that commit to `master` as `github-actions[bot]`. If `master` has already moved past the tag, it skips this with a warning so newer entries aren't swept into the wrong version.
+
+Required repo secrets: `KEYSTORE_BASE64`, `KEYSTORE_PASSWORD`, `KEY_ALIAS`, `KEY_PASSWORD`, `SENTRY_AUTH_TOKEN`. Local builds keep Gradle's default `app-<variant>.apk` names.
+
+There is no separate CI job for tests/lint today; see [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for details and known gaps.
 
 ## Documentation
 
