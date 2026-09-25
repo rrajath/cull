@@ -9,7 +9,7 @@ plugins {
 // Single source of truth for the app version, bumped by hand on release (semver).
 // Reused for versionName, the Sentry release manifest placeholder, and (via
 // `printVersionName`) the release workflow, which checks the pushed tag matches it.
-val appVersionName = "1.0.58"
+val appVersionName = "1.1.0"
 
 // versionCode = MAJOR * 10000 + MINOR * 100 + PATCH (1.2.3 -> 10203)
 val appVersionCode = run {
