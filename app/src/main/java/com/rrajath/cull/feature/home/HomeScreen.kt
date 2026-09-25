@@ -25,9 +25,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.rrajath.cull.R
 import com.rrajath.cull.core.datastore.SettingsRepository
 import com.rrajath.cull.ui.component.CircleIcon
 import com.rrajath.cull.ui.component.ContinuePill
@@ -197,7 +199,7 @@ private fun CullMark(
 ) {
     val colors = ThemeColors.current
     Text(
-        text = "Cull",
+        text = stringResource(R.string.app_name),
         style = androidx.compose.material3.MaterialTheme.typography.headlineLarge.copy(
             color = colors.fg,
             fontStyle = FontStyle.Italic,
