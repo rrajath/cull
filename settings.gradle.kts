@@ -19,6 +19,6 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "occullt"
+rootProject.name = "cull"
 include(":app")
  

@@ -23,11 +23,11 @@ val appVersionName = "1.0.${gitCommitCount()}"
 val appVersionCode = gitCommitCount()
 
 android {
-    namespace = "com.rrajath.occullt"
+    namespace = "com.rrajath.cull"
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.rrajath.occullt"
+        applicationId = "com.rrajath.cull"
         minSdk = 34
         targetSdk = 36
         versionCode = appVersionCode

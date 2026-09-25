@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**Cull** (`com.rrajath.occullt`) is an Android photo-culling app built with Kotlin and Jetpack Compose. Users review photos from local device storage and/or a self-hosted Immich server, pin a reference photo, long-press to compare, and swipe down to mark photos for deletion.
+**Cull** (`com.rrajath.cull`) is an Android photo-culling app built with Kotlin and Jetpack Compose. Users review photos from local device storage and/or a self-hosted Immich server, pin a reference photo, long-press to compare, and swipe down to mark photos for deletion.
 
 - **Min SDK:** Android 14 (API 34), **Target SDK:** Android 15 (API 36)
 - **Build system:** Gradle with Kotlin DSL; single `:app` module
@@ -20,13 +20,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ./gradlew test
 
 # Run a single unit test
-./gradlew test --tests "com.rrajath.occullt.feature.stacks.StacksViewModelTest"
+./gradlew test --tests "com.rrajath.cull.feature.stacks.StacksViewModelTest"
 
 # Instrumented tests (requires connected device/emulator)
 ./gradlew connectedAndroidTest
 
 # Run a single instrumented test
-./gradlew connectedAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.rrajath.occullt.core.database.ImmichAssetMappingDbTest
+./gradlew connectedAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.rrajath.cull.core.database.ImmichAssetMappingDbTest
 
 # Lint
 ./gradlew lint
@@ -51,7 +51,7 @@ feature/
   viewer/          # Full-screen viewer, ViewerViewModel
   stacks/          # Time-window photo groups, StacksViewModel
   settings/        # Source mode, folder picker, Immich config
-navigation/        # OcculltNavHost, type-safe Route definitions, SessionViewModel
+navigation/        # CullNavHost, type-safe Route definitions, SessionViewModel
 ui/
   component/       # GiantButton, CircleIcon, SourceSwitcher, ContinuePill, etc.
   icon/            # CullIcons custom icon set
@@ -84,7 +84,7 @@ ui/
 
 Type-safe routes via `@Serializable` data objects/classes in `navigation/Route.kt`:
 - `Home`, `Library`, `Viewer(photoIndex, folderUri)`, `Settings`, `Stacks`, `StackGrid(stackIndex)`
-- All wired in `OcculltNavHost`; `SessionViewModel` scoped to the nav host
+- All wired in `CullNavHost`; `SessionViewModel` scoped to the nav host
 
 ## State Persistence (DataStore)
 
@@ -120,13 +120,13 @@ All exposed as `Flow<T>`.
 - Zoom/pan of current photo mirrors to pinned photo
 
 ### Immich API (`ImmichApi.kt`)
-- Auth: `x-api-key` header injected by OkHttp interceptor in `OcculltApplication`; `ImmichKeyGate` only allows it when the request's scheme/host/port match the configured Immich URL and the path is an `/api/assets/` endpoint
+- Auth: `x-api-key` header injected by OkHttp interceptor in `CullApplication`; `ImmichKeyGate` only allows it when the request's scheme/host/port match the configured Immich URL and the path is an `/api/assets/` endpoint
 - Cleartext HTTP is blocked app-wide (`network_security_config.xml`) — server URLs must be `https://`
 - Pagination: offset-based (`page` + `size`), no cursor
 - Search: `POST /api/search/metadata` → results at `assets.items` (nested)
 - JSON parsed manually via `JsonElement`/`JsonObject` (no Moshi/Gson)
 
-### Application Setup (`OcculltApplication`)
+### Application Setup (`CullApplication`)
 - Initializes Coil 3 singleton with OkHttp fetcher (memory cache 25%, disk 2%)
 - Stores Immich credentials (API key + base URL) globally (companion object); updated when settings change
 
@@ -152,8 +152,8 @@ Uses `MockWebServer` for HTTP, real DataStore/SQLite:
 
 | File | Purpose |
 |---|---|
-| `OcculltApplication.kt` | Coil setup, Immich API key storage, OkHttp interceptor |
-| `navigation/OcculltNavHost.kt` | Navigation graph |
+| `CullApplication.kt` | Coil setup, Immich API key storage, OkHttp interceptor |
+| `navigation/CullNavHost.kt` | Navigation graph |
 | `navigation/Route.kt` | All route definitions |
 | `core/datastore/SettingsRepository.kt` | All persistent state |
 | `core/network/ImmichApi.kt` | Immich HTTP client |

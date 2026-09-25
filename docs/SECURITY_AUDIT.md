@@ -1,4 +1,4 @@
-# Security Audit — Cull (occullt)
+# Security Audit — Cull
 
 **Date:** 2026-07-10
 **Scope:** Full repository — Android manifest, network security config, backup rules, Immich API client, secret storage and handling, settings export/import, SQLite layer, logging, CI/release pipeline, and full VCS history scan for committed secrets.
@@ -59,7 +59,7 @@ Deliberate accepts: `includeSourceContext` stays enabled (source exposure to Sen
 
 ### 3. API key attached by URL substring, not host
 
-**Location:** `OcculltApplication.kt:37`
+**Location:** `CullApplication.kt:37`
 
 **Finding:** The Coil OkHttp interceptor adds the `x-api-key` header to any request whose URL merely *contains* `/api/assets/`, with no verification that the request host is the configured Immich server.
 

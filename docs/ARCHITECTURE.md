@@ -46,7 +46,7 @@ Each feature package pairs a Composable `*Screen.kt` with a `*ViewModel.kt` (plu
 
 ### `navigation/`
 
-Type-safe routes are declared as `@Serializable` data objects/classes in `Route.kt` (`Home`, `Library`, `Viewer(photoIndex, folderUri)`, `Settings`, `Stacks`, `StackGrid(stackIndex)`, and the Wizard routes) and wired together in `OcculltNavHost.kt`. `SessionViewModel` is scoped to the nav host (survives navigation but not process death beyond what `SettingsRepository` persists) — it holds the last-viewed photo index/folder URI for the "Continue where you left off" flow and exposes a `reloadTrigger: StateFlow` that downstream screens observe to know when to refresh (e.g., after a delete changes the underlying photo set).
+Type-safe routes are declared as `@Serializable` data objects/classes in `Route.kt` (`Home`, `Library`, `Viewer(photoIndex, folderUri)`, `Settings`, `Stacks`, `StackGrid(stackIndex)`, and the Wizard routes) and wired together in `CullNavHost.kt`. `SessionViewModel` is scoped to the nav host (survives navigation but not process death beyond what `SettingsRepository` persists) — it holds the last-viewed photo index/folder URI for the "Continue where you left off" flow and exposes a `reloadTrigger: StateFlow` that downstream screens observe to know when to refresh (e.g., after a delete changes the underlying photo set).
 
 ### `ui/`
 
@@ -101,13 +101,13 @@ Wizard segment state and the local↔Immich asset mapping live in SQLite (`core/
 
 ### Immich integration
 
-- Auth: an OkHttp interceptor registered in `OcculltApplication` injects the `x-api-key` header for image requests. `ImmichKeyGate` gates the injection — the request's scheme, host, and port must match the configured Immich base URL and the path must be an `/api/assets/` endpoint, so the key can never be sent to a foreign host. Credentials (key + base URL) are held in a companion object and updated whenever Settings changes them.
+- Auth: an OkHttp interceptor registered in `CullApplication` injects the `x-api-key` header for image requests. `ImmichKeyGate` gates the injection — the request's scheme, host, and port must match the configured Immich base URL and the path must be an `/api/assets/` endpoint, so the key can never be sent to a foreign host. Credentials (key + base URL) are held in a companion object and updated whenever Settings changes them.
 - Pagination is offset-based (`page` + `size`); there is no cursor API.
 - Search uses `POST /api/search/metadata`, whose results are nested at `assets.items`.
 
 ### Image loading
 
-`OcculltApplication` configures a singleton Coil 3 `ImageLoader` with an OkHttp-based fetcher (memory cache capped at 25% of available memory, disk cache capped at 2%), used for both local (`DocumentFile`/`content://`) and Immich (`https://`) image sources through the same `UnifiedPhotoItem` URLs.
+`CullApplication` configures a singleton Coil 3 `ImageLoader` with an OkHttp-based fetcher (memory cache capped at 25% of available memory, disk cache capped at 2%), used for both local (`DocumentFile`/`content://`) and Immich (`https://`) image sources through the same `UnifiedPhotoItem` URLs.
 
 ## Technology Choices
 

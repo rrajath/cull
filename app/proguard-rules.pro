@@ -27,10 +27,10 @@
 # kotlinx.serialization: keep generated serializers for @Serializable classes
 # (SettingsExport, type-safe navigation routes) that are looked up reflectively.
 -keepattributes *Annotation*, InnerClasses
--keepclassmembers class com.rrajath.occullt.** {
+-keepclassmembers class com.rrajath.cull.** {
     *** Companion;
 }
--keepclasseswithmembers class com.rrajath.occullt.** {
+-keepclasseswithmembers class com.rrajath.cull.** {
     kotlinx.serialization.KSerializer serializer(...);
 }
--keep,includedescriptorclasses class com.rrajath.occullt.**$$serializer { *; }
+-keep,includedescriptorclasses class com.rrajath.cull.**$$serializer { *; }

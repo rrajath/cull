@@ -69,7 +69,7 @@ On first launch, choose **Library** and pick a folder via the system folder pick
 ./gradlew test
 
 # Run a single unit test
-./gradlew test --tests "com.rrajath.occullt.feature.stacks.StacksViewModelTest"
+./gradlew test --tests "com.rrajath.cull.feature.stacks.StacksViewModelTest"
 
 # Instrumented tests (requires a connected device/emulator)
 ./gradlew connectedAndroidTest

@@ -27,3 +27,6 @@ sentry.properties
 *.keystore
 
 PROGRESS.md
+
+# Local-only notes, plans, learnings
+internal/
